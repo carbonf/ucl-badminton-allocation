@@ -10,14 +10,21 @@ from enum import Enum
 # Configuration
 MEMBERSHIP_PATH = Path("data/Club-society membership list - DO NOT SHARE - 2025-12-08T00_05_29+0000.csv")
 SIGNUP_PATH = Path("data/UCL Badminton Social Session Signups (5 Jun 2026)(1-16).xlsx")
+OUTPUT_PATH = Path("outputs/allocations.xlsx")
+CHECK_MEMBERSHIP = True
 AVAILABLE_SLOTS = 18
+MEMBERSHIP_EMAIL_COL = "Email"
 
 class Col(str, Enum):
+	# The values MUST BE THE EXACT QUESTION TEXT
 	NAME = "Name"
 	EMAIL = "Email"
 	FULL_NAME = "Full name"
 	UCL_EMAIL_ADDR = "UCL email address"
-
+	SESSIONS = "Which sessions are you available for?"
+	PAIRING = "Do you have a partner you would like to play together with?"
+	PARTNER_NAME = "Partner's full name"
+	PARTNER_EMAIL = "Partner's UCL email"
 
 
 
@@ -64,7 +71,33 @@ def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
 	
 	return df
 
-def random_allocation(df: pd.DataFrame, capacity: int) -> list:
+def check_columns(df: pd.DataFrame, cols: list[str], label: str) -> None:
+	missing = [c for c in cols if c not in df.columns]
+	if missing:
+		raise KeyError(f"{label} is missing columns: {', '.join(missing)}")
+
+def clean_signups(df: pd.DataFrame) -> pd.DataFrame:
+	check_columns(df, [Col.NAME, Col.EMAIL, Col.SESSIONS], "Sign-ups")
+	df = df.copy()
+	df["_email"] = df[Col.EMAIL.value].astype(str).str.strip().str.lower()
+	if "Completion time" in df.columns:          # Forms adds this; keep latest submission
+		df = df.sort_values("Completion time")
+	before = len(df)
+	df = df.drop_duplicates(subset="_email", keep="last").reset_index(drop=True)
+	print(f"Removed {before - len(df)} duplicate entries.")
+
+	df["_sessions"] = df[Col.SESSIONS.value].apply(
+		lambda c: [] if pd.isna(c) else [s.strip() for s in str(c).split(";") if s.strip()]
+	)
+	df["_partner"] = (
+		df[Col.PARTNER_EMAIL.value].fillna("").astype(str).str.strip().str.lower()
+		if Col.PARTNER_EMAIL.value in df.columns else ""
+	)
+	return df
+
+
+
+def random_allocation_simple(df: pd.DataFrame, capacity: int) -> list:
 	# Randomly picks n players based on pandas sample() method.
 	n = min(capacity, len(df))
 	sampled_df = df.sample(n=n)
@@ -83,14 +116,22 @@ def print_results(allocated_list: list) -> None:
 		name = player.get(Col.NAME.value) or player.get(Col.FULL_NAME.value) or "No Name Found"
 		print(f"{i}. {name}")
 
+
 def main() -> None:
-	signups = load_file(SIGNUP_PATH)
-	preview(signups, 10, "def.csv")
-	
-	signups = remove_duplicates(signups)
-	
-	allocated = random_allocation(signups, AVAILABLE_SLOTS)
-	print_results(allocated)
+	# Load signups as df and sanity check preview
+	signups = clean_signups(load_file(SIGNUP_PATH))
+	preview(signups, 10, "Sign-ups")
+
+	# Create empty df and check memberships for all
+	not_members = signups.iloc[0:0]
+	if CHECK_MEMBERSHIP:
+		signups, not_members = split_members(signups, load_file(MEMBERSHIP_PATH))
+		print(f"{len(not_members)} sign-ups not found on membership list.")
+
+	result, sessions = random_allocation(signups)
+
+	print("\n" + result["Allocated session"].value_counts().to_string())
+	save_results(result, sessions, not_members)
 
 
 
