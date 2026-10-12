@@ -95,6 +95,16 @@ def clean_signups(df: pd.DataFrame) -> pd.DataFrame:
 	)
 	return df
 
+def split_members(signups: pd.DataFrame, members: pd.DataFrame):
+	"""Checks if people in signups are club members. Filters signups to retain only members. Returns df of nonmembers too"""
+	
+	check_columns(members, [MEMBERSHIP_EMAIL_COL], "Membership list")
+	# Create set of member emails from df
+	member_emails = set(members[MEMBERSHIP_EMAIL_COL].astype(str).str.strip().str.lower())
+	# Use boolean mask to filter member rows
+	is_member = signups["_email"].isin(member_emails)
+	return signups[is_member].reset_index(drop=True), signups[~is_member]
+
 
 
 def random_allocation_simple(df: pd.DataFrame, capacity: int) -> list:
