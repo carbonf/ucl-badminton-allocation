@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 import random
+import re
 import pandas as pd
 from dotenv import load_dotenv
 
@@ -28,7 +29,32 @@ class Col(str, Enum):
 	PARTNER_NAME = "Partner's full name"
 	PARTNER_EMAIL = "Partner's UCL email"
 
+# ---------- Session short names ----------
+SESSION_RE = re.compile(r"(\d{1,2} \w{3}) \((\w{3})\) (\d{1,2}:\d{2}[ap]m)")
+SESSION_FULL: dict[str, str] = {}   # short name -> full form text
 
+
+def short_name(full: str) -> str:
+    """'18 Oct (Sun) 9:00am - ... (COACHED SESSION)' -> 'Sun 18 Oct 9:00am (coached)'"""
+    m = SESSION_RE.search(full)
+    if not m:
+        label = full
+    else:
+        date, day, start = m.groups()
+        label = f"{day} {date} {start}"
+        if "COACHED" in full.upper():
+            label += " (coached)"
+    base, n = label, 2
+    while label in SESSION_FULL and SESSION_FULL[label] != full:
+        label, n = f"{base} #{n}", n + 1
+    SESSION_FULL[label] = full
+    return label
+
+
+def parse_sessions(cell) -> list[str]:
+    if pd.isna(cell):
+        return []
+    return [short_name(s.strip()) for s in str(cell).split(";") if s.strip()]
 
 def load_file(path: Path) -> pd.DataFrame:
 	# Dynamically load file into pandas dataframe based on extension.
@@ -45,19 +71,10 @@ def load_file(path: Path) -> pd.DataFrame:
 	return df
 
 def preview(df: pd.DataFrame, num_rows: int, label: str) -> None:
-	# Preview specified columns of the file defined in class Col. 
-
-	total = len(df)
-	num_rows = min(num_rows, total)
-	print(f"\n{label} - Showing {num_rows} rows out of {total}")
-	
-	# Check that queried columns actually exist
-	missing = [col.value for col in Col if col.value not in df.columns]
-	if missing:
-		raise KeyError(f"{label} is missing columns: {', '.join(missing)}")
-
-	preview_cols = [col.value for col in Col]
-	print(df[preview_cols].head(num_rows).to_string(index=False))
+    cols = [c.value for c in Col if c.value in df.columns]
+    n = min(num_rows, len(df))
+    print(f"\n{label} - showing {n} of {len(df)} rows")
+    print(df[cols].head(n).to_string(index=False))
 
 def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
 	# Removes duplicates.
@@ -79,24 +96,47 @@ def check_columns(df: pd.DataFrame, cols: list[str], label: str) -> None:
 	if missing:
 		raise KeyError(f"{label} is missing columns: {', '.join(missing)}")
 
-def clean_signups(df: pd.DataFrame) -> pd.DataFrame:
-	check_columns(df, [Col.NAME, Col.EMAIL, Col.SESSIONS], "Sign-ups")
-	df = df.copy()
-	df["_email"] = df[Col.UCL_EMAIL_ADDR.value].astype(str).str.strip().str.lower()
-	if "Completion time" in df.columns:          # Forms adds this; keep latest submission
-		df = df.sort_values("Completion time")
-	before = len(df)
-	df = df.drop_duplicates(subset="_email", keep="last").reset_index(drop=True)
-	print(f"Removed {before - len(df)} duplicate entries.")
+def tag(df: pd.DataFrame, reason: str) -> pd.DataFrame:
+    """Reduce rows to the columns worth showing in the Rejected sheet, plus a reason."""
+    out = df.copy()
+    out["Sessions requested"] = out["_sessions"].apply(lambda lst: "; ".join(lst))
+    out["Reason"] = reason
+    cols = [Col.NAME.value, Col.EMAIL.value, Col.FULL_NAME.value,
+            Col.UCL_EMAIL_ADDR.value, "Sessions requested", "Reason"]
+    return out[[c for c in cols if c in out.columns]]
 
-	df["_sessions"] = df[Col.SESSIONS.value].apply(
-		lambda c: [] if pd.isna(c) else [s.strip() for s in str(c).split(";") if s.strip()]
-	)
-	df["_partner"] = (
-		df[Col.PARTNER_EMAIL.value].fillna("").astype(str).str.strip().str.lower()
-		if Col.PARTNER_EMAIL.value in df.columns else ""
-	)
-	return df
+def clean_signups(df: pd.DataFrame):
+    """Returns (valid sign-ups, list of rejected DataFrames)."""
+    check_columns(df, [Col.NAME.value, Col.EMAIL.value, Col.UCL_EMAIL_ADDR.value,
+                       Col.SESSIONS.value], "Sign-ups")
+    df = df.copy()
+    rejected: list[pd.DataFrame] = []
+
+    df["_email"] = df[Col.UCL_EMAIL_ADDR.value].fillna("").astype(str).str.strip().str.lower()
+    df["_sessions"] = df[Col.SESSIONS.value].apply(parse_sessions)
+    df["_partner"] = (
+        df[Col.PARTNER_EMAIL.value].fillna("").astype(str).str.strip().str.lower()
+        if Col.PARTNER_EMAIL.value in df.columns else ""
+    )
+
+    blank = df["_email"] == ""
+    if blank.any():
+        rejected.append(tag(df[blank], "No UCL email given"))
+    df = df[~blank]
+
+    if "Completion time" in df.columns:
+        df = df.sort_values("Completion time")
+    dup = df.duplicated(subset="_email", keep="last")
+    if dup.any():
+        rejected.append(tag(df[dup], "Superseded by a later submission"))
+    df = df[~dup]
+
+    none_ticked = df["_sessions"].apply(len) == 0
+    if none_ticked.any():
+        rejected.append(tag(df[none_ticked], "No sessions selected"))
+    df = df[~none_ticked]
+
+    return df.reset_index(drop=True), rejected
 
 def split_members(signups: pd.DataFrame, members: pd.DataFrame):
 	"""Checks if people in signups are club members. Filters signups to retain only members. Returns df of nonmembers too"""
@@ -130,7 +170,7 @@ def build_groups(df: pd.DataFrame) -> list[dict]:
 	return groups
 
 
-def random_allocation(df: pd.DataFrame) -> pd.DataFrame:
+def random_allocation(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 	rng = random.Random(SEED)
 	groups = build_groups(df)
 	sessions = list(dict.fromkeys(s for g in groups for s in g["sessions"]))
@@ -156,19 +196,23 @@ def random_allocation(df: pd.DataFrame) -> pd.DataFrame:
 	return out, sessions
 
 
-def save_results(result: pd.DataFrame, sessions: list[str], not_members: pd.DataFrame) -> None:
-	cols = [Col.NAME.value, Col.EMAIL.value, "Allocated session"]
-	with pd.ExcelWriter(OUTPUT_PATH) as writer:
-		result[cols].to_excel(writer, sheet_name="All results", index=False)   # mail-merge source
-		for s in sessions:
-			sheet = s[:31].translate(str.maketrans("/:\\?*[]", "-.-----"))
-			result.loc[result["Allocated session"] == s, cols].to_excel(
-				writer, sheet_name=sheet, index=False)
-		if len(not_members):
-			not_members[[Col.NAME.value, Col.EMAIL.value]].to_excel(
-				writer, sheet_name="Not members", index=False)
-	print(f"\nWrote {OUTPUT_PATH}")
+def sheet_name(s: str) -> str:
+    return s[:31].translate(str.maketrans("/:\\?*[]", "-.-----"))
 
+
+def save_results(allocated: pd.DataFrame, sessions: list[str], rejected: pd.DataFrame) -> None:
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    allocated = allocated.copy()
+    allocated["Session (full)"] = allocated["Allocated session"].map(SESSION_FULL)
+    cols = [Col.FULL_NAME.value, Col.UCL_EMAIL_ADDR.value, "Allocated session", "Session (full)"]
+
+    with pd.ExcelWriter(OUTPUT_PATH) as writer:
+        allocated[cols].to_excel(writer, sheet_name="All allocated", index=False)
+        for s in sessions:
+            allocated.loc[allocated["Allocated session"] == s, cols[:2]].to_excel(
+                writer, sheet_name=sheet_name(s), index=False)
+        rejected.to_excel(writer, sheet_name="Rejected", index=False)
+    print(f"\nWrote {OUTPUT_PATH}")
 
 def random_allocation_simple(df: pd.DataFrame, capacity: int) -> list:
 	# Randomly picks n players based on pandas sample() method.
@@ -191,20 +235,35 @@ def print_results(allocated_list: list) -> None:
 
 
 def main() -> None:
-	# Load signups as df and sanity check preview
-	signups = clean_signups(load_file(SIGNUP_PATH))
-	preview(signups, 10, "Sign-ups")
+    raw = load_file(SIGNUP_PATH)
+    signups, rejected = clean_signups(raw)
+    preview(signups, 10, "Sign-ups")
 
-	# Create empty df and check memberships for all
-	not_members = signups.iloc[0:0]
-	if CHECK_MEMBERSHIP:
-		signups, not_members = split_members(signups, load_file(MEMBERSHIP_PATH))
-		print(f"{len(not_members)} sign-ups not found on membership list.")
+    print("\nSessions found:")
+    for short, full in SESSION_FULL.items():
+        print(f"  {short:32} <- {full}")
 
-	result, sessions = random_allocation(signups)
+    if CHECK_MEMBERSHIP:
+        signups, not_members = split_members(signups, load_file(MEMBERSHIP_PATH))
+        if len(not_members):
+            rejected.append(tag(not_members, "Not on membership list"))
 
-	print("\n" + result["Allocated session"].value_counts().to_string())
-	save_results(result, sessions, not_members)
+    result, sessions = random_allocation(signups)
+    is_unallocated = result["Allocated session"] == "UNALLOCATED"
+    if is_unallocated.any():
+        rejected.append(tag(result[is_unallocated], "All selected sessions full"))
+    allocated = result[~is_unallocated]
+
+    rejected_df = pd.concat(rejected, ignore_index=True) if rejected else pd.DataFrame()
+
+    print(f"\n{len(raw)} rows in file -> {len(allocated)} allocated, {len(rejected_df)} rejected")
+    print("\nAllocated per session:")
+    print(allocated["Allocated session"].value_counts().to_string())
+    if len(rejected_df):
+        print("\nRejected by reason:")
+        print(rejected_df["Reason"].value_counts().to_string())
+
+    save_results(allocated, sessions, rejected_df)
 
 
 
