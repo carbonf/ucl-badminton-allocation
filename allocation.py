@@ -127,6 +127,45 @@ def build_groups(df: pd.DataFrame) -> list[dict]:
 	return groups
 
 
+def random_allocation(df: pd.DataFrame) -> pd.DataFrame:
+	rng = random.Random(SEED)
+	groups = build_groups(df)
+	sessions = list(dict.fromkeys(s for g in groups for s in g["sessions"]))
+	demand = {s: sum(s in g["sessions"] for g in groups) for s in sessions}
+	remaining = {
+		s: CAPACITY_PER_SESSION[s] if isinstance(CAPACITY_PER_SESSION, dict) else CAPACITY_PER_SESSION
+		for s in sessions
+	}
+	placed: dict[int, str] = {}
+
+	for s in sorted(sessions, key=demand.get):              # scarcest session first
+		pool = [g for g in groups if s in g["sessions"] and g["members"][0] not in placed]
+		rng.shuffle(pool)
+		for g in pool:
+			if len(g["members"]) <= remaining[s]:           # pairs only fit if both fit
+				for m in g["members"]:
+					placed[m] = s
+				remaining[s] -= len(g["members"])
+
+	out = df.copy()
+	out["Allocated session"] = out.index.map(placed.get)
+	out["Allocated session"] = out["Allocated session"].fillna("UNALLOCATED")
+	return out, sessions
+
+
+def save_results(result: pd.DataFrame, sessions: list[str], not_members: pd.DataFrame) -> None:
+	cols = [Col.NAME.value, Col.EMAIL.value, "Allocated session"]
+	with pd.ExcelWriter(OUTPUT_PATH) as writer:
+		result[cols].to_excel(writer, sheet_name="All results", index=False)   # mail-merge source
+		for s in sessions:
+			sheet = s[:31].translate(str.maketrans("/:\\?*[]", "-.-----"))
+			result.loc[result["Allocated session"] == s, cols].to_excel(
+				writer, sheet_name=sheet, index=False)
+		if len(not_members):
+			not_members[[Col.NAME.value, Col.EMAIL.value]].to_excel(
+				writer, sheet_name="Not members", index=False)
+	print(f"\nWrote {OUTPUT_PATH}")
+
 
 def random_allocation_simple(df: pd.DataFrame, capacity: int) -> list:
 	# Randomly picks n players based on pandas sample() method.
