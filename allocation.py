@@ -106,6 +106,27 @@ def split_members(signups: pd.DataFrame, members: pd.DataFrame):
 	return signups[is_member].reset_index(drop=True), signups[~is_member]
 
 
+def build_groups(df: pd.DataFrame) -> list[dict]:
+	"""Each group is one player, or two partners who must share a session."""
+	idx_by_email = {e: i for i, e in df["_email"].items()}
+	used, groups = set(), []
+
+	for i, row in df.iterrows():
+		if i in used:
+			continue
+		j = idx_by_email.get(row["_partner"])
+		if j is not None and j != i and j not in used:
+			common = [s for s in row["_sessions"] if s in df.at[j, "_sessions"]]
+			if common:
+				groups.append({"members": [i, j], "sessions": common})
+				used.update({i, j})
+				continue
+			print(f"WARNING: {row['_email']} and partner have no common session; treated separately.")
+		groups.append({"members": [i], "sessions": row["_sessions"]})
+		used.add(i)
+	return groups
+
+
 
 def random_allocation_simple(df: pd.DataFrame, capacity: int) -> list:
 	# Randomly picks n players based on pandas sample() method.
