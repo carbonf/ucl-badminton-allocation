@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import random
 import pandas as pd
 from dotenv import load_dotenv
 
@@ -8,11 +9,12 @@ load_dotenv()
 from enum import Enum
 
 # Configuration
-MEMBERSHIP_PATH = Path("data/Club-society membership list - DO NOT SHARE - 2025-12-08T00_05_29+0000.csv")
-SIGNUP_PATH = Path("data/UCL Badminton Social Session Signups (5 Jun 2026)(1-16).xlsx")
+MEMBERSHIP_PATH = Path("data/Club-society membership list - DO NOT SHARE - 2026-10-10T00_52_13+0100.csv")
+SIGNUP_PATH = Path("data/UCL Badminton Social Session Signups (Week 1)(1-114).xlsx")
 OUTPUT_PATH = Path("outputs/allocations.xlsx")
 CHECK_MEMBERSHIP = True
-AVAILABLE_SLOTS = 18
+CAPACITY = 18
+SEED = None
 MEMBERSHIP_EMAIL_COL = "Email"
 
 class Col(str, Enum):
@@ -21,7 +23,7 @@ class Col(str, Enum):
 	EMAIL = "Email"
 	FULL_NAME = "Full name"
 	UCL_EMAIL_ADDR = "UCL email address"
-	SESSIONS = "Which sessions are you available for?"
+	SESSIONS = "Please select the sessions you wish to sign up for:"
 	PAIRING = "Do you have a partner you would like to play together with?"
 	PARTNER_NAME = "Partner's full name"
 	PARTNER_EMAIL = "Partner's UCL email"
@@ -33,13 +35,14 @@ def load_file(path: Path) -> pd.DataFrame:
 	
 	if not path.exists():
 		raise FileNotFoundError(f"Missing file: {path.resolve()}")
-
 	if path.suffix.lower() in {".xlsx", ".xls"}:
-		return pd.read_excel(path)
+		df = pd.read_excel(path)
 	elif path.suffix.lower() == ".csv":
-		return pd.read_csv(path)
-
-	raise ValueError(f"Unsupported file type: {path.suffix}")
+		df = pd.read_csv(path, encoding="utf-8-sig")
+	else:
+		raise ValueError(f"Unsupported file type: {path.suffix}")
+	df.columns = df.columns.str.strip()
+	return df
 
 def preview(df: pd.DataFrame, num_rows: int, label: str) -> None:
 	# Preview specified columns of the file defined in class Col. 
@@ -79,7 +82,7 @@ def check_columns(df: pd.DataFrame, cols: list[str], label: str) -> None:
 def clean_signups(df: pd.DataFrame) -> pd.DataFrame:
 	check_columns(df, [Col.NAME, Col.EMAIL, Col.SESSIONS], "Sign-ups")
 	df = df.copy()
-	df["_email"] = df[Col.EMAIL.value].astype(str).str.strip().str.lower()
+	df["_email"] = df[Col.UCL_EMAIL_ADDR.value].astype(str).str.strip().str.lower()
 	if "Completion time" in df.columns:          # Forms adds this; keep latest submission
 		df = df.sort_values("Completion time")
 	before = len(df)
@@ -133,7 +136,7 @@ def random_allocation(df: pd.DataFrame) -> pd.DataFrame:
 	sessions = list(dict.fromkeys(s for g in groups for s in g["sessions"]))
 	demand = {s: sum(s in g["sessions"] for g in groups) for s in sessions}
 	remaining = {
-		s: CAPACITY_PER_SESSION[s] if isinstance(CAPACITY_PER_SESSION, dict) else CAPACITY_PER_SESSION
+		s: CAPACITY[s] if isinstance(CAPACITY, dict) else CAPACITY
 		for s in sessions
 	}
 	placed: dict[int, str] = {}
