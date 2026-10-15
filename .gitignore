@@ -2,7 +2,7 @@
 .xlsx
 .env
 data/
-output/
+outputs/
 __pycache__/
 *.pyc
 .venv/
