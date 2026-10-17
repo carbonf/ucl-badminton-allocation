@@ -13,28 +13,24 @@ load_dotenv()
 from enum import Enum
 
 # Configuration
-MEMBERSHIP_PATH = Path("data/Club-society membership list - DO NOT SHARE - 2026-10-12T17_44_07+0100.csv")
-SIGNUP_PATH = Path("data/UCL Badminton Social Session Signups (Week 1)(1-114).xlsx")
-OUTPUT_PATH = Path("outputs/allocations.xlsx")
+MEMBERSHIPS_PATH = Path("data/Club-society membership list - DO NOT SHARE - 2026-10-12T17_44_07+0100.csv")
+SIGNUPS_PATH = Path("data/UCL Badminton Social Session Signups (Week 1)(1-114).xlsx")
+OUTPUTS_PATH = Path("outputs/allocations.xlsx")
 HISTORY_PATH = Path("data/history.csv")
 BIG = 1e6   # cost of a seat the person didn't tick; must dwarf every real cost
 CHECK_MEMBERSHIP = True
-SEED = None
-MEMBERSHIP_EMAIL_COL = "Email"
+SEED = 69
 DEFAULT_CAPACITY = 18
-CAPACITY = {
-	# cap = no. of courts * 6 + 3
+CAPACITIES = {
 	"Tue 13 Oct 6:00pm": 15,
 	"Sat 17 Oct 1:30pm": 15,
-	"Sat 17 Oct 3:15pm": 15,
-	"Sun 18 Oct 9:00am (coached)": 21,
+	"Sat 17 Oct 3:30pm": 15,
 	"Sun 18 Oct 10:30am": 21,
 	"Sun 18 Oct 11:45am": 21,
-	# sessions not listed here use DEFAULT_CAPACITY
 }
 
 class Col(str, Enum):
-	# The values MUST BE THE EXACT QUESTION TEXT
+	# The values MUST BE THE EXACT QUESTION TEXT. Corresponds to columns in the sheet SIGNUPS_PATH
 	NAME = "Name"
 	EMAIL = "Email"
 	FULL_NAME = "Full name"
@@ -49,27 +45,26 @@ SESSION_RE = re.compile(r"(\d{1,2} \w{3}) \((\w{3})\) (\d{1,2}:\d{2}[ap]m)")
 SESSION_FULL: dict[str, str] = {}   # short name -> full form text
 
 
-def short_name(full: str) -> str:
-	"""'18 Oct (Sun) 9:00am - ... (COACHED SESSION)' -> 'Sun 18 Oct 9:00am (coached)'"""
+def shorten_name(full: str) -> str:
+	# Takes a full session name and shortens it.
+
 	m = SESSION_RE.search(full)
 	if not m:
-		label = full
+		shortened = full
 	else:
 		date, day, start = m.groups()
-		label = f"{day} {date} {start}"
-		if "COACHED" in full.upper():
-			label += " (coached)"
-	base, n = label, 2
-	while label in SESSION_FULL and SESSION_FULL[label] != full:
-		label, n = f"{base} #{n}", n + 1
-	SESSION_FULL[label] = full
-	return label
+		shortened = f"{day} {date} {start}"
+	
+	SESSION_FULL[shortened] = full
+	return shortened
 
 
 def parse_sessions(cell) -> list[str]:
+	# Used to parse chosen sessions for each entry
+	
 	if pd.isna(cell):
 		return []
-	return [short_name(s.strip()) for s in str(cell).split(";") if s.strip()]
+	return [shorten_name(s.strip()) for s in str(cell).split(";") if s.strip()]
 
 def load_file(path: Path) -> pd.DataFrame:
 	# Dynamically load file into pandas dataframe based on extension.
@@ -234,8 +229,8 @@ def random_allocation(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 		g["prio"] = max(priority(df.at[m, "_email"], history) for m in g["members"])
 
 	sessions = list(dict.fromkeys(s for g in groups for s in g["sessions"]))
-	capacity = {s: CAPACITY.get(s, DEFAULT_CAPACITY) for s in sessions}
-	unknown = set(CAPACITY) - set(sessions)
+	capacity = {s: CAPACITIES.get(s, DEFAULT_CAPACITY) for s in sessions}
+	unknown = set(CAPACITIES) - set(sessions)
 	if unknown:
 		print(f"WARNING: CAPACITY has no matching session for: {', '.join(sorted(unknown))}")
 
@@ -264,18 +259,18 @@ def sheet_name(s: str) -> str:
 
 
 def save_results(allocated: pd.DataFrame, sessions: list[str], rejected: pd.DataFrame) -> None:
-	OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+	OUTPUTS_PATH.parent.mkdir(parents=True, exist_ok=True)
 	allocated = allocated.copy()
 	allocated["Session (full)"] = allocated["Allocated session"].map(SESSION_FULL)
 	cols = [Col.FULL_NAME.value, Col.UCL_EMAIL_ADDR.value, "Allocated session", "Session (full)"]
 
-	with pd.ExcelWriter(OUTPUT_PATH) as writer:
+	with pd.ExcelWriter(OUTPUTS_PATH) as writer:
 		allocated[cols].to_excel(writer, sheet_name="All allocated", index=False)
 		for s in sessions:
 			allocated.loc[allocated["Allocated session"] == s, cols[:2]].to_excel(
 				writer, sheet_name=sheet_name(s), index=False)
 		rejected.to_excel(writer, sheet_name="Rejected", index=False)
-	print(f"\nWrote {OUTPUT_PATH}")
+	print(f"\nWrote {OUTPUTS_PATH}")
 
 def random_allocation_simple(df: pd.DataFrame, capacity: int) -> list:
 	# Randomly picks n players based on pandas sample() method.
@@ -298,7 +293,7 @@ def print_results(allocated_list: list) -> None:
 
 
 def main() -> None:
-	raw = load_file(SIGNUP_PATH)
+	raw = load_file(SIGNUPS_PATH)
 	signups, rejected = clean_signups(raw)
 	preview(signups, 10, "Sign-ups")
 
@@ -307,7 +302,7 @@ def main() -> None:
 		print(f"  {short:32} <- {full}")
 
 	if CHECK_MEMBERSHIP:
-		signups, not_members = split_members(signups, load_file(MEMBERSHIP_PATH))
+		signups, not_members = split_members(signups, load_file(MEMBERSHIPS_PATH))
 		if len(not_members):
 			rejected.append(tag(not_members, "Not on membership list"))
 
