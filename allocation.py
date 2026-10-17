@@ -4,6 +4,9 @@ import random
 import re
 import pandas as pd
 from dotenv import load_dotenv
+import sys
+import numpy as np
+from scipy.optimize import linear_sum_assignment
 
 load_dotenv()
 
@@ -13,6 +16,8 @@ from enum import Enum
 MEMBERSHIP_PATH = Path("data/Club-society membership list - DO NOT SHARE - 2026-10-12T17_44_07+0100.csv")
 SIGNUP_PATH = Path("data/UCL Badminton Social Session Signups (Week 1)(1-114).xlsx")
 OUTPUT_PATH = Path("outputs/allocations.xlsx")
+HISTORY_PATH = Path("data/history.csv")
+BIG = 1e6   # cost of a seat the person didn't tick; must dwarf every real cost
 CHECK_MEMBERSHIP = True
 SEED = None
 MEMBERSHIP_EMAIL_COL = "Email"
@@ -179,52 +184,80 @@ def build_groups(df: pd.DataFrame) -> list[dict]:
 		used.add(i)
 	return groups
 
+def load_history() -> pd.DataFrame:
+	"""One row per person: how often they've played / been turned away."""
+	if HISTORY_PATH.exists():
+		h = pd.read_csv(HISTORY_PATH)
+		h["ucl_email"] = h["ucl_email"].str.strip().str.lower()
+		return h.set_index("ucl_email")[["played", "missed_out"]].astype(int)
+	return pd.DataFrame(columns=["played", "missed_out"]).astype(int).rename_axis("ucl_email")
+
+
+def priority(email: str, history: pd.DataFrame) -> float:
+	"""Lower = placed first. Unknown people count as zero."""
+	if email in history.index:
+		r = history.loc[email]
+		return r["played"] * 100 - r["missed_out"] * 10
+	return 0.0
+
+
+def update_history(played_emails, missed_emails) -> None:
+	h = load_history()
+	for e in list(played_emails) + list(missed_emails):
+		if e not in h.index:
+			h.loc[e] = [0, 0]
+	h.loc[list(played_emails), "played"] += 1
+	h.loc[list(missed_emails), "missed_out"] += 1
+	HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+	h.to_csv(HISTORY_PATH)
+
+def match(units: list[dict], seats: dict[str, int], rng: random.Random) -> dict[int, str]:
+	"""Optimal assignment of units to seats. Returns {unit index: session}."""
+	columns = [s for s, n in seats.items() for _ in range(n)]   # one column per seat
+	if not units or not columns:
+		return {}
+	cost = np.full((len(units), len(columns)), BIG)
+	for r, u in enumerate(units):
+		base = u["prio"] + rng.random()            # per-person noise = random tie-break
+		for c, s in enumerate(columns):
+			if s in u["sessions"]:
+				cost[r, c] = base + rng.random() * 1e-4   # tiny per-seat noise spreads flexible people
+	rows, cols = linear_sum_assignment(cost)
+	return {r: columns[c] for r, c in zip(rows, cols) if cost[r, c] < BIG}
+
 
 def random_allocation(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
-    rng = random.Random(SEED)
-    groups = build_groups(df)
-    sessions = list(dict.fromkeys(s for g in groups for s in g["sessions"]))
-    
-    # FIX: Calculate total individual seats requested per session, not just group count
-    demand = {
-        s: sum(len(g["members"]) for g in groups if s in g["sessions"]) 
-        for s in sessions
-    }
-    
-    remaining = {s: CAPACITY.get(s, DEFAULT_CAPACITY) for s in sessions}
-    
-    # Scarcity metric: ratio of demand to capacity (higher ratio = scarcer session)
-    def scarcity_score(s):
-        cap = remaining.get(s, DEFAULT_CAPACITY)
-        if cap == 0:
-            return float('inf')
-        return demand[s] / cap
+	rng = random.Random(SEED)
+	history = load_history()
+	groups = build_groups(df)
+	for g in groups:                               # a pair takes its worse member's priority
+		g["prio"] = max(priority(df.at[m, "_email"], history) for m in g["members"])
 
-    for s in sorted(sessions, key=scarcity_score, reverse=True):
-        print(f"{s:32} requested seats: {demand[s]:3} | capacity {remaining[s]}")
-        
-    unknown = set(CAPACITY) - set(sessions)
-    if unknown:
-        print(f"WARNING: CAPACITY has no matching session for: {', '.join(sorted(unknown))}")
-        
-    placed: dict[int, str] = {}
+	sessions = list(dict.fromkeys(s for g in groups for s in g["sessions"]))
+	capacity = {s: CAPACITY.get(s, DEFAULT_CAPACITY) for s in sessions}
+	unknown = set(CAPACITY) - set(sessions)
+	if unknown:
+		print(f"WARNING: CAPACITY has no matching session for: {', '.join(sorted(unknown))}")
 
-    # Process scarcest sessions first based on the scarcity score
-    for s in sorted(sessions, key=scarcity_score, reverse=True):
-        pool = [g for g in groups if s in g["sessions"] and g["members"][0] not in placed]
-        rng.shuffle(pool)
-        pool.sort(key=lambda g: len(g["sessions"]))  # fewest options first; stable tie-break
-        
-        for g in pool:
-            if len(g["members"]) <= remaining[s]:
-                for m in g["members"]:
-                    placed[m] = s
-                remaining[s] -= len(g["members"])
+	placed: dict[int, str] = {}
 
-    out = df.copy()
-    out["Allocated session"] = out.index.map(placed.get)
-    out["Allocated session"] = out["Allocated session"].fillna("UNALLOCATED")
-    return out, sessions
+	# Pass 1: pairs. Each session offers capacity//2 "double seats".
+	pairs = [g for g in groups if len(g["members"]) == 2]
+	for r, s in match(pairs, {s: capacity[s] // 2 for s in sessions}, rng).items():
+		for m in pairs[r]["members"]:
+			placed[m] = s
+		capacity[s] -= 2
+
+	# Pass 2: singles fill whatever seats are left.
+	singles = [g for g in groups if len(g["members"]) == 1]
+	for r, s in match(singles, capacity, rng).items():
+		placed[singles[r]["members"][0]] = s
+
+	out = df.copy()
+	out["Allocated session"] = out.index.map(placed.get)
+	out["Allocated session"] = out["Allocated session"].fillna("UNALLOCATED")
+	return out, sessions
+
 
 def sheet_name(s: str) -> str:
 	return s[:31].translate(str.maketrans("/:\\?*[]", "-.-----"))
@@ -294,7 +327,11 @@ def main() -> None:
 		print(rejected_df["Reason"].value_counts().to_string())
 
 	save_results(allocated, sessions, rejected_df)
-
+	if "--commit" in sys.argv:
+		update_history(allocated["_email"], result.loc[is_unallocated, "_email"])
+		print("History updated.")
+	else:
+		print("Dry run: history not updated. Re-run with --commit to record this week.")
 
 
 if __name__ == "__main__":
