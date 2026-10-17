@@ -1,22 +1,19 @@
-from pathlib import Path
-import os
 import random
 import re
-import pandas as pd
-from dotenv import load_dotenv
 import sys
-import numpy as np
-from scipy.optimize import milp, LinearConstraint, Bounds
-
-load_dotenv()
-
 from enum import Enum
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from scipy.optimize import milp, LinearConstraint, Bounds
 
 # Configuration
 MEMBERSHIPS_PATH = Path("data/Club-society membership list - DO NOT SHARE - 2026-10-12T17_44_07+0100.csv")
 SIGNUPS_PATH = Path("data/UCL Badminton Social Session Signups (Week 1)(1-114).xlsx")
 OUTPUTS_PATH = Path("outputs/allocations.xlsx")
 HISTORY_PATH = Path("data/history.csv")
+HISTORY_COLS = ["played", "missed_out", "recency"]
 CHECK_MEMBERSHIP = True
 SEED = 69
 
@@ -38,13 +35,16 @@ CAPACITIES = {
 	"Sun 18 Oct 11:45am": 21,
 }
 
-# Run with --debug for verbose diagnostics (scoring, history, matching decisions, checks).
-DEBUG = "--debug" in sys.argv
+# Verbose diagnostics (scoring, history, matching decisions, checks) are on by default; --quiet turns them off.
+# Nothing is written to disk unless --commit is given (workbook and history).
+DEBUG = "--quiet" not in sys.argv
+COMMIT = "--commit" in sys.argv
 
 
 def debug(*args) -> None:
 	if DEBUG:
 		print("[debug]", *args)
+
 
 class Col(str, Enum):
 	# The values MUST BE THE EXACT QUESTION TEXT. Corresponds to columns in the sheet SIGNUPS_PATH
@@ -53,8 +53,6 @@ class Col(str, Enum):
 	FULL_NAME = "Full name"
 	UCL_EMAIL_ADDR = "UCL email address"
 	SESSIONS = "Please select the sessions you wish to sign up for:"
-	PAIRING = "Do you have a partner you would like to play together with?"
-	PARTNER_NAME = "Partner's full name"
 	PARTNER_EMAIL = "Partner's UCL email"
 
 # ---------- Session short names ----------
@@ -180,11 +178,14 @@ def build_groups(df: pd.DataFrame) -> list[dict]:
 		# Look up the partner the person named (if that partner also signed up).
 		j = idx_by_email.get(row["_partner"])
 		if row["_partner"] and j is None:
-			debug(f"pairing: {row['_email']} named partner {row['_partner']} who is not in the sign-ups; treated as single")
-		if j is not None and j != i and j not in used:
-			if df.at[j, "_partner"] != row["_email"]:
-				debug(f"pairing: {row['_email']} named {row['_partner']} but it is not reciprocated (they named '{df.at[j, '_partner']}'); pairing anyway")
-			# A pair can only play in sessions BOTH of them ticked.
+			print(f"WARNING: {row['_email']} named partner {row['_partner']} who has no valid sign-up; treated as single.")
+		elif j == i:
+			print(f"WARNING: {row['_email']} named themselves as partner; treated as single.")
+		elif j is not None and df.at[j, "_partner"] != row["_email"]:
+			# One-sided declaration: both people must name each other, otherwise no pair.
+			print(f"WARNING: {row['_email']} named {row['_partner']}, who did not name them back; treated as single.")
+		elif j is not None and j not in used:
+			# Mutual declaration. A pair can only play in sessions BOTH of them ticked.
 			common = [s for s in row["_sessions"] if s in df.at[j, "_sessions"]]
 			if common:
 				groups.append({"members": [i, j], "sessions": common,
@@ -193,8 +194,6 @@ def build_groups(df: pd.DataFrame) -> list[dict]:
 				continue
 			# No overlap: they cannot be seated together, so fall back to individuals.
 			print(f"WARNING: {row['_email']} and partner have no common session; treated separately.")
-		elif j is not None and j != i:
-			debug(f"pairing: {row['_email']}'s partner {row['_partner']} is already in another group; treated as single")
 		groups.append({"members": [i], "sessions": row["_sessions"], "label": row["_email"]})
 		used.add(i)
 	n_pairs = sum(len(g["members"]) == 2 for g in groups)
@@ -203,21 +202,22 @@ def build_groups(df: pd.DataFrame) -> list[dict]:
 
 def load_history() -> pd.DataFrame:
 	"""One row per person: times played, times turned away, runs since they last played."""
-	if HISTORY_PATH.exists():
-		h = pd.read_csv(HISTORY_PATH)
-		h["ucl_email"] = h["ucl_email"].str.strip().str.lower()
-		h = h.set_index("ucl_email")
-		if "recency" not in h.columns:           # older history files: treat as played long ago
-			debug(f"history: {HISTORY_PATH} has no 'recency' column; everyone set to {RECENCY_CAP}")
-			h["recency"] = RECENCY_CAP
-		h["recency"] = h["recency"].fillna(RECENCY_CAP)
-		h[["played", "missed_out", "recency"]] = h[["played", "missed_out", "recency"]].astype(int)
-		debug(f"history: loaded {len(h)} people from {HISTORY_PATH} "
-			  f"(total played={h['played'].sum()}, missed={h['missed_out'].sum()}, "
-			  f"avg recency={h['recency'].mean():.1f})")
-		return h[["played", "missed_out", "recency"]]
-	debug(f"history: no file at {HISTORY_PATH}; everyone is treated as a newcomer")
-	return pd.DataFrame(columns=["played", "missed_out", "recency"]).astype(int).rename_axis("ucl_email")
+	if not HISTORY_PATH.exists():
+		debug(f"history: no file at {HISTORY_PATH}; everyone is treated as a newcomer")
+		return pd.DataFrame(columns=HISTORY_COLS).astype(int).rename_axis("ucl_email")
+
+	h = pd.read_csv(HISTORY_PATH)
+	h["ucl_email"] = h["ucl_email"].str.strip().str.lower()
+	h = h.set_index("ucl_email")
+	if "recency" not in h.columns:           # older history files: treat as played long ago
+		debug(f"history: {HISTORY_PATH} has no 'recency' column; everyone set to {RECENCY_CAP}")
+		h["recency"] = RECENCY_CAP
+	h["recency"] = h["recency"].fillna(RECENCY_CAP)
+	h[HISTORY_COLS] = h[HISTORY_COLS].astype(int)
+	debug(f"history: loaded {len(h)} people from {HISTORY_PATH} "
+		  f"(total played={h['played'].sum()}, missed={h['missed_out'].sum()}, "
+		  f"avg recency={h['recency'].mean():.1f})")
+	return h[HISTORY_COLS]
 
 
 def history_row(email: str, history: pd.DataFrame) -> tuple[int, int, int, bool]:
@@ -239,7 +239,24 @@ def priority(email: str, history: pd.DataFrame) -> float:
 	return W_PLAYED * played - W_MISSED * missed - W_RECENCY * recency
 
 
+def debug_history_update(before: pd.DataFrame, after: pd.DataFrame, played: list[str],
+						 missed: list[str], write: bool) -> None:
+	if not DEBUG:
+		return
+	touched = set(played) | set(missed)
+	new = [e for e in after.index if e not in before.index]
+	only_aged = len(before) - len(touched & set(before.index))
+	debug(f"history update ({'saved' if write else 'DRY RUN, not saved'}): {len(played)} played, "
+		  f"{len(missed)} missed out, {len(new)} new people, {only_aged} others only aged (+1 recency)")
+	for e in sorted(touched):
+		b = before.loc[e] if e in before.index else None
+		a = after.loc[e]
+		bs = "NEW" if b is None else f"p={b['played']} m={b['missed_out']} r={b['recency']}"
+		debug(f"  {e:36} {bs:>20}  ->  p={a['played']} m={a['missed_out']} r={a['recency']}")
+
+
 def update_history(played_emails, missed_emails, write: bool = True) -> None:
+	"""Record one run: played/missed counts, and age everyone's recency by one run."""
 	h = load_history()
 	before = h.copy()
 	played_emails, missed_emails = list(played_emails), list(missed_emails)
@@ -250,20 +267,9 @@ def update_history(played_emails, missed_emails, write: bool = True) -> None:
 	h.loc[played_emails, "recency"] = 0          # ...except those who just played, who reset
 	h.loc[played_emails, "played"] += 1
 	h.loc[missed_emails, "missed_out"] += 1
-	h[["played", "missed_out", "recency"]] = h[["played", "missed_out", "recency"]].astype(int)
+	h[HISTORY_COLS] = h[HISTORY_COLS].astype(int)
 
-	if DEBUG:
-		touched = set(played_emails) | set(missed_emails)
-		new = [e for e in h.index if e not in before.index]
-		debug(f"history update ({'saved' if write else 'DRY RUN, not saved'}): {len(played_emails)} played, "
-			  f"{len(missed_emails)} missed out, {len(new)} new people, "
-			  f"{len(before) - len(touched & set(before.index))} others only aged (+1 recency)")
-		for e in sorted(touched):
-			b = before.loc[e] if e in before.index else None
-			a = h.loc[e]
-			bs = "NEW" if b is None else f"p={b['played']} m={b['missed_out']} r={b['recency']}"
-			debug(f"  {e:36} {bs:>20}  ->  p={a['played']} m={a['missed_out']} r={a['recency']}")
-
+	debug_history_update(before, h, played_emails, missed_emails, write)
 	if write:
 		HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
 		h.to_csv(HISTORY_PATH)
@@ -329,8 +335,8 @@ def match(groups: list[dict], capacity: dict[str, int], rng: random.Random) -> d
 		else:
 			debug(f"match #{rank:<3} SKIP   prio={g['prio']:+7.1f} noise={noise[gi]:.2f} "
 				  f"{g['label']}: no room in any of {', '.join(g['sessions'])} alongside higher-ranked groups")
-		# else: it doesn't fit (sessions full, or a pair needs 2 seats); skip it and keep
-		# trying lower-ranked groups, which may still fit in leftover seats.
+		# A skipped group (sessions full, or a pair needs 2 seats) doesn't stop the loop: lower-ranked
+		# groups are still tried and may fit in leftover seats.
 	return placed
 
 
@@ -355,49 +361,71 @@ def verify_allocation(df: pd.DataFrame, groups: list[dict], assignment: dict[int
 		debug(f"  {s:24} {used[s]:>3}/{capacity[s]} seats used")
 
 
-def random_allocation(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
-	rng = random.Random(SEED)
-	history = load_history()
-	groups = build_groups(df)
-	for g in groups:                               # same formula for singles and pairs
-		# STEP 2b: group score = average of members' history scores (a pair is weighed like
-		# its two people, neither queue-jumping nor being dragged down by the worse partner),
-		# minus a flexibility reward: W_FLEX per extra ticked session (for pairs, sessions
-		# both ticked).
+def score_groups(df: pd.DataFrame, groups: list[dict], history: pd.DataFrame) -> None:
+	"""STEP 2: set g["prio"] on every group (lower = placed first)."""
+	# Group score = average of members' history scores (a pair is weighed like its two people,
+	# neither queue-jumping nor being dragged down by the worse partner), minus a flexibility
+	# reward: W_FLEX per extra ticked session (for pairs, sessions both ticked).
+	for g in groups:
 		members = [priority(df.at[m, "_email"], history) for m in g["members"]]
 		g["prio"] = sum(members) / len(members) - W_FLEX * (len(g["sessions"]) - 1)
 
-	if DEBUG:
-		debug(f"scoring: score = {W_PLAYED}*played - {W_MISSED}*missed - {W_RECENCY}*min(recency,{RECENCY_CAP}); "
-			  f"pair = mean of members; then - {W_FLEX}*(sessions - 1). Lower is placed first.")
-		for rank, g in enumerate(sorted(groups, key=lambda g: g["prio"]), 1):
-			parts = []
-			for m in g["members"]:
-				e = df.at[m, "_email"]
-				p, mi, rec, known = history_row(e, history)
-				parts.append(f"{e} [{'known' if known else 'NEW'} played={p} missed={mi} "
-							 f"recency={rec}{'->' + str(RECENCY_CAP) if rec > RECENCY_CAP else ''}] base={priority(e, history):+.0f}")
-			debug(f"  #{rank:<3} prio={g['prio']:+7.1f} (flex: {len(g['sessions'])} sessions) | " + " ; ".join(parts))
 
-	# Only sessions someone ticked get a seat pool; capacity comes from CAPACITIES or the default.
-	sessions = list(dict.fromkeys(s for g in groups for s in g["sessions"]))
-	capacity = {s: CAPACITIES.get(s, DEFAULT_CAPACITY) for s in sessions}
+def build_capacity(sessions: list[str]) -> dict[str, int]:
+	"""Seats per session: from CAPACITIES, else DEFAULT_CAPACITY (with a warning)."""
 	for s in sessions:
 		if s not in CAPACITIES:
 			print(f"WARNING: no capacity configured for '{s}'; using DEFAULT_CAPACITY={DEFAULT_CAPACITY}")
 	unknown = set(CAPACITIES) - set(sessions)
 	if unknown:
 		print(f"WARNING: CAPACITY has no matching session for: {', '.join(sorted(unknown))}")
-	if DEBUG:
-		for s in sessions:
-			wanting = [g for g in groups if s in g["sessions"]]
-			debug(f"demand {s:24} capacity={capacity[s]:>3}  people ticking={sum(len(g['members']) for g in wanting):>3} "
-				  f"({len(wanting)} groups)")
+	return {s: CAPACITIES.get(s, DEFAULT_CAPACITY) for s in sessions}
 
-	# Run the matcher, then expand each group's session back to every member (both partners
-	# of a pair get the same session). Anyone missing from `placed` becomes UNALLOCATED.
-	assignment = match(groups, capacity, rng)
+
+def debug_scores(df: pd.DataFrame, groups: list[dict], history: pd.DataFrame) -> None:
+	if not DEBUG:
+		return
+	debug(f"scoring: score = {W_PLAYED}*played - {W_MISSED}*missed - {W_RECENCY}*min(recency,{RECENCY_CAP}); "
+		  f"pair = mean of members; then - {W_FLEX}*(sessions - 1). Lower is placed first.")
+	for rank, g in enumerate(sorted(groups, key=lambda g: g["prio"]), 1):
+		parts = []
+		for m in g["members"]:
+			e = df.at[m, "_email"]
+			p, mi, rec, known = history_row(e, history)
+			clamp = f"->{RECENCY_CAP}" if rec > RECENCY_CAP else ""
+			parts.append(f"{e} [{'known' if known else 'NEW'} played={p} missed={mi} recency={rec}{clamp}] "
+						 f"base={priority(e, history):+.0f}")
+		debug(f"  #{rank:<3} prio={g['prio']:+7.1f} (flex: {len(g['sessions'])} sessions) | " + " ; ".join(parts))
+
+
+def debug_demand(groups: list[dict], capacity: dict[str, int]) -> None:
+	if not DEBUG:
+		return
+	for s in capacity:
+		wanting = [g for g in groups if s in g["sessions"]]
+		debug(f"demand {s:24} capacity={capacity[s]:>3}  people ticking={sum(len(g['members']) for g in wanting):>3} "
+			  f"({len(wanting)} groups)")
+
+
+def allocate(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+	"""Gives every sign-up a session or "UNALLOCATED". Returns (df + "Allocated session", session names)."""
+	rng = random.Random(SEED)
+	history = load_history()
+
+	groups = build_groups(df)                      # STEP 1
+	score_groups(df, groups, history)              # STEP 2
+	debug_scores(df, groups, history)
+
+	# Only sessions someone ticked get a seat pool.
+	sessions = list(dict.fromkeys(s for g in groups for s in g["sessions"]))
+	capacity = build_capacity(sessions)
+	debug_demand(groups, capacity)
+
+	assignment = match(groups, capacity, rng)      # STEPS 3-4
 	verify_allocation(df, groups, assignment, capacity)
+
+	# Expand each group's session back to every member (both partners of a pair get the same
+	# session). Anyone missing from `placed` becomes UNALLOCATED.
 	placed: dict[int, str] = {}
 	for gi, s in assignment.items():
 		for m in groups[gi]["members"]:
@@ -427,25 +455,6 @@ def save_results(allocated: pd.DataFrame, sessions: list[str], rejected: pd.Data
 		rejected.to_excel(writer, sheet_name="Rejected", index=False)
 	print(f"\nWrote {OUTPUTS_PATH}")
 
-def random_allocation_simple(df: pd.DataFrame, capacity: int) -> list:
-	# Randomly picks n players based on pandas sample() method.
-	n = min(capacity, len(df))
-	sampled_df = df.sample(n=n)
-	
-	# Keep only the columns specified in the Col Enum (that exist in the df)
-	keep_cols = [col.value for col in Col if col.value in df.columns]
-	sampled_df = sampled_df[keep_cols]
-	
-	# Convert the randomly sampled rows to a list of dictionaries
-	return sampled_df.to_dict(orient="records")
-
-def print_results(allocated_list: list) -> None:
-	print(f"\n--- Allocated Players ({len(allocated_list)}) ---")
-	for i, player in enumerate(allocated_list, start=1):
-		# Try to find the name key (could be Name or Full name depending on file)
-		name = player.get(Col.NAME.value) or player.get(Col.FULL_NAME.value) or "No Name Found"
-		print(f"{i}. {name}")
-
 
 def main() -> None:
 	raw = load_file(SIGNUPS_PATH)
@@ -464,7 +473,7 @@ def main() -> None:
 		if len(not_members):
 			rejected.append(tag(not_members, "Not on membership list"))
 
-	result, sessions = random_allocation(signups)
+	result, sessions = allocate(signups)
 	is_unallocated = result["Allocated session"] == "UNALLOCATED"
 	if is_unallocated.any():
 		rejected.append(tag(result[is_unallocated], "All selected sessions full"))
@@ -479,14 +488,14 @@ def main() -> None:
 		print("\nRejected by reason:")
 		print(rejected_df["Reason"].value_counts().to_string())
 
-	save_results(allocated, sessions, rejected_df)
-	if "--commit" in sys.argv:
+	if COMMIT:
+		save_results(allocated, sessions, rejected_df)
 		update_history(allocated["_email"], result.loc[is_unallocated, "_email"])
 		print("History updated.")
 	else:
 		if DEBUG:   # show what a commit would change, without saving
 			update_history(allocated["_email"], result.loc[is_unallocated, "_email"], write=False)
-		print("Dry run: history not updated. Re-run with --commit to record this week.")
+		print(f"\nDRY RUN: nothing saved (no {OUTPUTS_PATH}, history unchanged). Re-run with --commit to save.")
 
 
 if __name__ == "__main__":
