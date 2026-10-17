@@ -61,7 +61,7 @@ def shorten_name(full: str) -> str:
 
 def parse_sessions(cell) -> list[str]:
 	# Used to parse chosen sessions for each entry
-	
+
 	if pd.isna(cell):
 		return []
 	return [shorten_name(s.strip()) for s in str(cell).split(";") if s.strip()]
@@ -86,21 +86,6 @@ def preview(df: pd.DataFrame, num_rows: int, label: str) -> None:
 	print(f"\n{label} - showing {n} of {len(df)} rows")
 	print(df[cols].head(n).to_string(index=False))
 
-def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
-	# Removes duplicates.
-	email_col = None
-	if Col.EMAIL.value in df.columns:
-		email_col = Col.EMAIL.value
-	else:
-		raise KeyError("Missing email column!")
-		
-	initial_count = len(df)
-	df = df.drop_duplicates(subset=[email_col], keep="last")
-	removed_count = initial_count - len(df)
-	print(f"Removed {removed_count} duplicate entries based on {email_col}.")
-	
-	return df
-
 def check_columns(df: pd.DataFrame, cols: list[str], label: str) -> None:
 	missing = [c for c in cols if c not in df.columns]
 	if missing:
@@ -116,12 +101,13 @@ def tag(df: pd.DataFrame, reason: str) -> pd.DataFrame:
 	return out[[c for c in cols if c in out.columns]]
 
 def clean_signups(df: pd.DataFrame):
-	"""Returns (valid sign-ups, list of rejected DataFrames)."""
-	check_columns(df, [Col.NAME.value, Col.EMAIL.value, Col.UCL_EMAIL_ADDR.value,
+	"""Cleans signup entries, rejects invalid formatting. Returns (valid sign-ups, list of rejected DataFrames)."""
+	check_columns(df, [Col.NAME.value, Col.UCL_EMAIL_ADDR.value,
 					   Col.SESSIONS.value], "Sign-ups")
 	df = df.copy()
 	rejected: list[pd.DataFrame] = []
 
+	# Construct cleaned fields for each entry
 	df["_email"] = df[Col.UCL_EMAIL_ADDR.value].fillna("").astype(str).str.strip().str.lower()
 	df["_sessions"] = df[Col.SESSIONS.value].apply(parse_sessions)
 	df["_partner"] = (
@@ -129,11 +115,13 @@ def clean_signups(df: pd.DataFrame):
 		if Col.PARTNER_EMAIL.value in df.columns else ""
 	)
 
+	# Remove entries with blank emails
 	blank = df["_email"] == ""
 	if blank.any():
 		rejected.append(tag(df[blank], "No UCL email given"))
 	df = df[~blank]
 
+	# Remove duped entries
 	if "Completion time" in df.columns:
 		df = df.sort_values("Completion time")
 	dup = df.duplicated(subset="_email", keep="last")
@@ -141,6 +129,7 @@ def clean_signups(df: pd.DataFrame):
 		rejected.append(tag(df[dup], "Superseded by a later submission"))
 	df = df[~dup]
 
+	# Remove entries with no selected sessions
 	none_ticked = df["_sessions"].apply(len) == 0
 	if none_ticked.any():
 		rejected.append(tag(df[none_ticked], "No sessions selected"))
@@ -151,9 +140,11 @@ def clean_signups(df: pd.DataFrame):
 def split_members(signups: pd.DataFrame, members: pd.DataFrame):
 	"""Checks if people in signups are club members. Filters signups to retain only members. Returns df of nonmembers too"""
 	
-	check_columns(members, [MEMBERSHIP_EMAIL_COL], "Membership list")
+	check_columns(members, ["Email"], "Membership list")
+
 	# Create set of member emails from df
-	member_emails = set(members[MEMBERSHIP_EMAIL_COL].astype(str).str.strip().str.lower())
+	member_emails = set(members["Email"].astype(str).str.strip().str.lower())
+	
 	# Use boolean mask to filter member rows
 	is_member = signups["_email"].isin(member_emails)
 	return signups[is_member].reset_index(drop=True), signups[~is_member]
