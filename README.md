@@ -1,6 +1,64 @@
-# ucl-badminton-allocation
+# UCL Badminton session allocation
 
-Allocates UCL Badminton social-session sign-ups to sessions. It favours people who have played less, been turned away more, or not played for a while. It handles partner sign-ups and keeps every session within capacity.
+This is the program we use to decide who gets a place in our social sessions when more people sign up than there are spaces. It is public so that any member can see exactly how places are decided. You don't need to read any code to understand it: the first half of this page explains it in plain English.
+
+This repository contains no member data. Sign-up lists, membership lists and results are kept private.
+
+## What members need to know
+
+**The aim:** everyone gets a fair turn. If you have played a lot recently, people who haven't played much go ahead of you. If you were turned away last time, you move up.
+
+### How places are decided
+
+Everyone who signs up gets a priority score. **A lower score means you are placed earlier.** Your score depends on three things from past allocations:
+
+| What | Effect on your score |
+| --- | --- |
+| Each time you have been given a place | Moves you back (+20) |
+| Each time you signed up and were turned away | Moves you forward (-10) |
+| Each week since you last played | Moves you forward (-15 per week, up to 8 weeks) |
+
+New members count as having never played, so they start with the full 8-week bonus.
+
+Then there is one small extra: each additional session you tick (beyond the first) moves you forward by 2 points. This only matters when two people are otherwise level, so ticking more sessions helps a little but never beats playing less often.
+
+### Example
+
+| Person | History | Score |
+| --- | --- | --- |
+| A | New member | -120 |
+| B | Never played, turned away twice | -140 |
+| C | Played once, four weeks ago | -25 |
+| D | Played once, last week | +20 |
+| E | Played three times, last two weeks ago | +45 |
+
+B is placed first, then A, C, D and E. If there are not enough seats, E (who has played most recently and often) is the one left out.
+
+### Placing people in sessions
+
+Going down the list from the lowest score, each person is given a place if the sessions they ticked still have room. Someone with a worse score can never take a place from someone with a better score. If a session is full, the program moves on to the next person, who may still fit in a different session. When someone ticked several sessions, the program picks one of them at random.
+
+### Partners
+
+If you sign up with a partner, you will both be placed in the same session or not placed at all. Each of you must enter the other's UCL email, and you can only be placed in sessions you both ticked. A pair's score is the score of whichever partner has the worse (higher) score, so pairing up can never move you ahead of where you would be on your own. The cost is that the partner with the better score is held back to match. If partner details don't match (for example only one of you named the other), you are treated as individual sign-ups.
+
+### Where chance comes in
+
+Chance is used in two places only: to break ties between people with the same score, and to choose between several sessions you ticked. Everything else follows the rules above. The random number generator uses a fixed number (`SEED` in `main.py`), so the same sign-ups always give the same result.
+
+### Things that are not perfect
+
+- If the next person in line is a pair and only one seat is left in a session, that seat can stay empty even though someone further down could take it.
+- The program is run once and the results are saved. Each week's results and history are kept privately, so you can't re-run the allocation yourself, but you can read the exact rules it follows.
+- Only members on the membership list are allocated. Each sign-up is checked for a valid UCL email, and if you submit more than once, only your latest submission counts.
+
+### Questions or concerns
+
+If you think you were allocated unfairly, contact the committee.
+
+---
+
+# For developers
 
 ## Setup
 
@@ -54,7 +112,7 @@ Everyone on a session sheet gets `played=1`.
 
 1. **Cleaning.** Rows are rejected if they have no UCL email, were superseded by a later submission from the same email, selected no sessions, or are not on the membership list.
 2. **Groups.** Each person is a single. Two people form a pair only if they name each other as partner. A pair needs 2 seats in one session, and the sessions it can use are those both ticked. One-sided, self-naming, unknown-partner or no-common-session declarations fall back to singles, with a warning.
-3. **Scoring.** Lower scores are placed first. Per person: `20*played - 10*missed_out - 15*min(recency, 8)`. A group's score is the mean of its members' scores, minus `2` per extra session ticked, so flexibility only decides near-ties. Newcomers count as never having played, with recency at the cap of 8.
+3. **Scoring.** Lower scores are placed first. Per person: `20*played - 10*missed_out - 15*min(recency, 8)`. A group's score is the worse (higher) of its members' scores, minus `2` per extra session ticked, so flexibility only decides near-ties. Newcomers count as never having played, with recency at the cap of 8.
 4. **Matching.** Groups are taken in score order, with small random noise to break ties. Each group is accepted only if everyone accepted so far can still be seated. This is checked by solving a small integer linear program (`scipy.optimize.milp`). Groups that don't fit are skipped, and later ones are still tried. Higher-priority groups are never bumped by lower-priority ones.
 5. **Checks.** `verify_allocation` always runs. It fails if anyone is placed in a session they didn't tick, if a pair is split, or if a session is over capacity.
 

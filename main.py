@@ -363,12 +363,12 @@ def verify_allocation(df: pd.DataFrame, groups: list[dict], assignment: dict[int
 
 def score_groups(df: pd.DataFrame, groups: list[dict], history: pd.DataFrame) -> None:
 	"""STEP 2: set g["prio"] on every group (lower = placed first)."""
-	# Group score = average of members' history scores (a pair is weighed like its two people,
-	# neither queue-jumping nor being dragged down by the worse partner), minus a flexibility
-	# reward: W_FLEX per extra ticked session (for pairs, sessions both ticked).
+	# Group score = the WORST (highest) history score among its members, so a pair is never placed
+	# ahead of where its lower-priority partner would be alone (no queue-jumping by pairing up).
+	# Then minus a flexibility reward: W_FLEX per extra ticked session (for pairs, sessions both ticked).
 	for g in groups:
 		members = [priority(df.at[m, "_email"], history) for m in g["members"]]
-		g["prio"] = sum(members) / len(members) - W_FLEX * (len(g["sessions"]) - 1)
+		g["prio"] = max(members) - W_FLEX * (len(g["sessions"]) - 1)
 
 
 def build_capacity(sessions: list[str]) -> dict[str, int]:
@@ -386,7 +386,7 @@ def debug_scores(df: pd.DataFrame, groups: list[dict], history: pd.DataFrame) ->
 	if not DEBUG:
 		return
 	debug(f"scoring: score = {W_PLAYED}*played - {W_MISSED}*missed - {W_RECENCY}*min(recency,{RECENCY_CAP}); "
-		  f"pair = mean of members; then - {W_FLEX}*(sessions - 1). Lower is placed first.")
+		  f"pair = worst (highest) member score; then - {W_FLEX}*(sessions - 1). Lower is placed first.")
 	for rank, g in enumerate(sorted(groups, key=lambda g: g["prio"]), 1):
 		parts = []
 		for m in g["members"]:
