@@ -46,12 +46,6 @@ If you sign up with a partner, you will both be placed in the same session or no
 
 Chance is used in two places only: to break ties between people with the same score, and to choose between several sessions you ticked. Everything else follows the rules above. The random number generator uses a fixed number (`SEED` in `main.py`), so the same sign-ups always give the same result.
 
-### Things that are not perfect
-
-- If the next person in line is a pair and only one seat is left in a session, that seat can stay empty even though someone further down could take it.
-- The program is run once and the results are saved. Each week's results and history are kept privately, so you can't re-run the allocation yourself, but you can read the exact rules it follows.
-- Only members on the membership list are allocated. Each sign-up is checked for a valid UCL email, and if you submit more than once, only your latest submission counts.
-
 ### Questions or concerns
 
 If you think you were allocated unfairly, contact the committee.
