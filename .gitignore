@@ -7,3 +7,4 @@ __pycache__/
 *.pyc
 .venv/
 allocate_week v2.py
+generate_history.py

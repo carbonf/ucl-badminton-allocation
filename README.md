@@ -67,10 +67,8 @@ pip install -r requirements.txt
 | Path | Purpose |
 | --- | --- |
 | `main.py` | The allocator. |
-| `generate_history.py` | Builds an initial `data/history.csv` from an existing allocation workbook. |
 | `data/` | Inputs and history. Gitignored, because it contains personal data. |
 | `outputs/allocations.xlsx` | Results workbook, written only with `--commit`. |
-| `allocate_week v2.py` | Legacy script, kept for reference. |
 
 ## Inputs
 
@@ -92,15 +90,9 @@ python main.py --commit     # save the workbook and update the history
 
 A run without `--commit` writes nothing, not even the workbook. Use it to check the result first. Run with `--commit` once, when you are happy with the allocation. Committing twice ages everyone's recency twice.
 
-### Initial history
+### History
 
-If you have a past allocation workbook but no history file:
-
-```bash
-python generate_history.py [allocation.xlsx] [--output data/history.csv] [--overwrite]
-```
-
-Everyone on a session sheet gets `played=1`.
+`data/history.csv` is created automatically the first time you run with `--commit`. Until then, everyone is treated as a newcomer.
 
 ## How it works
 
