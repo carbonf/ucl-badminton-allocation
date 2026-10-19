@@ -8,3 +8,4 @@ __pycache__/
 .venv/
 allocate_week v2.py
 generate_history.py
+test.py

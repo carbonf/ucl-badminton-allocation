@@ -96,7 +96,7 @@ A run without `--commit` writes nothing, not even the workbook. Use it to check 
 
 ## How it works
 
-1. **Cleaning.** Rows are rejected if they have no UCL email, were superseded by a later submission from the same email, selected no sessions, or are not on the membership list.
+1. **Cleaning.** Rows are rejected if they have no UCL email, selected no sessions, or are not on the membership list. If someone submits more than once, only their latest submission counts.
 2. **Groups.** Each person is a single. Two people form a pair only if they name each other as partner. A pair needs 2 seats in one session, and the sessions it can use are those both ticked. One-sided, self-naming, unknown-partner or no-common-session declarations fall back to singles, with a warning.
 3. **Scoring.** Lower scores are placed first. Per person: `20*played - 10*missed_out - 15*min(recency, 8)`. A group's score is the worse (higher) of its members' scores, minus `2` per extra session ticked, so flexibility only decides near-ties. Newcomers count as never having played, with recency at the cap of 8.
 4. **Matching.** Groups are taken in score order, with small random noise to break ties. Each group is accepted only if everyone accepted so far can still be seated. This is checked by solving a small integer linear program (`scipy.optimize.milp`). Groups that don't fit are skipped, and later ones are still tried. Higher-priority groups are never bumped by lower-priority ones.
@@ -113,7 +113,7 @@ Weights are `W_PLAYED`, `W_MISSED`, `W_RECENCY`, `RECENCY_CAP` and `W_FLEX` in `
 
 ## Output
 
-`outputs/allocations.xlsx` has an `All allocated` sheet, one sheet per session, and a `Rejected` sheet. The `Rejected` sheet gives a reason for each rejection: no email, superseded, no sessions, not a member, or all selected sessions full.
+`outputs/allocations.xlsx` has an `All allocated` sheet, one sheet per session, and a `Rejected` sheet. The `Rejected` sheet gives a reason for each rejection: no email, no sessions, not a member, or all selected sessions full.
 
 ## Known limitations
 

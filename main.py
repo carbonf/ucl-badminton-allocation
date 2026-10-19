@@ -1,5 +1,6 @@
 import random
 import re
+import shutil
 import sys
 from datetime import datetime
 from enum import Enum
@@ -16,6 +17,7 @@ SIGNUPS_DIR = Path("data")
 SIGNUPS_GLOB = "UCL Badminton Social Session Signups (Week *).xlsx"   # highest week number wins
 OUTPUTS_PATH = Path("outputs/allocations.xlsx")
 HISTORY_PATH = Path("data/history.csv")
+BACKUP_DIR = Path("data/backups")   # each --commit first copies the files it will overwrite here
 HISTORY_COLS = ["played", "missed_out", "recency"]
 CHECK_MEMBERSHIP = True
 SEED = 69
@@ -148,12 +150,10 @@ def check_columns(df: pd.DataFrame, cols: list[str], label: str) -> None:
 		raise KeyError(f"{label} is missing columns: {', '.join(missing)}")
 
 def tag(df: pd.DataFrame, reason: str) -> pd.DataFrame:
-	"""Reduce rows to the columns worth showing in the Rejected sheet, plus a reason."""
+	"""Reduce rows to full name, UCL email and the reason, for the Rejected sheet."""
 	out = df.copy()
-	out["Sessions requested"] = out["_sessions"].apply(lambda lst: "; ".join(lst))
 	out["Reason"] = reason
-	cols = [Col.NAME.value, Col.EMAIL.value, Col.FULL_NAME.value,
-			Col.UCL_EMAIL_ADDR.value, "Sessions requested", "Reason"]
+	cols = [Col.FULL_NAME.value, Col.UCL_EMAIL_ADDR.value, "Reason"]
 	return out[[c for c in cols if c in out.columns]]
 
 def clean_signups(df: pd.DataFrame):
@@ -177,12 +177,13 @@ def clean_signups(df: pd.DataFrame):
 		rejected.append(tag(df[blank], "No UCL email given"))
 	df = df[~blank]
 
-	# Remove duped entries
+	# Keep only each person's latest submission. Earlier ones are dropped silently: the latest
+	# one is what gets allocated or rejected, so listing the old one would hide the real reason.
 	if "Completion time" in df.columns:
 		df = df.sort_values("Completion time")
 	dup = df.duplicated(subset="_email", keep="last")
 	if dup.any():
-		rejected.append(tag(df[dup], "Superseded by a later submission"))
+		debug(f"{int(dup.sum())} earlier duplicate submission(s) ignored (latest per email is used)")
 	df = df[~dup]
 
 	# Remove entries with no selected sessions
@@ -482,6 +483,21 @@ def sheet_name(s: str) -> str:
 	return s[:31].translate(str.maketrans("/:\\?*[]", "-.-----"))
 
 
+def backup_state() -> Path | None:
+	"""Copy the files a commit overwrites (history and workbook) into BACKUP_DIR/<timestamp>/.
+	To undo a commit, copy them back. Returns the backup folder, or None if there was nothing to back up."""
+	existing = [p for p in (HISTORY_PATH, OUTPUTS_PATH) if p.exists()]
+	if not existing:
+		print("Backup: nothing to back up yet (first run).")
+		return None
+	dest = BACKUP_DIR / datetime.now().strftime("%Y-%m-%d_%H%M%S")
+	dest.mkdir(parents=True, exist_ok=False)
+	for p in existing:
+		shutil.copy2(p, dest / p.name)
+	print(f"Backup: saved {', '.join(p.name for p in existing)} to {dest}")
+	return dest
+
+
 def save_results(allocated: pd.DataFrame, sessions: list[str], rejected: pd.DataFrame) -> None:
 	OUTPUTS_PATH.parent.mkdir(parents=True, exist_ok=True)
 	allocated = allocated.copy()
@@ -495,6 +511,18 @@ def save_results(allocated: pd.DataFrame, sessions: list[str], rejected: pd.Data
 				writer, sheet_name=sheet_name(s), index=False)
 		rejected.to_excel(writer, sheet_name="Rejected", index=False)
 	print(f"\nWrote {OUTPUTS_PATH}")
+
+
+def print_rejected(rejected: pd.DataFrame) -> None:
+	"""List every rejected sign-up (email and name), grouped by reason."""
+	print("\nRejected sign-ups by reason:")
+	for reason, group in rejected.groupby("Reason", sort=False):
+		print(f"\n  {reason} ({len(group)}):")
+		for _, r in group.iterrows():
+			text = lambda col: "" if pd.isna(r.get(col)) else str(r.get(col)).strip()
+			email = text(Col.UCL_EMAIL_ADDR.value) or "(no UCL email)"
+			name = text(Col.FULL_NAME.value)
+			print(f"    {email:42} {name}")
 
 
 def main() -> None:
@@ -526,10 +554,10 @@ def main() -> None:
 	print("\nAllocated per session:")
 	print(allocated["Allocated session"].value_counts().to_string())
 	if len(rejected_df):
-		print("\nRejected by reason:")
-		print(rejected_df["Reason"].value_counts().to_string())
+		print_rejected(rejected_df)
 
 	if COMMIT:
+		backup_state()   # before anything is overwritten; an error here aborts the commit
 		save_results(allocated, sessions, rejected_df)
 		update_history(allocated["_email"], result.loc[is_unallocated, "_email"])
 		print("History updated.")
