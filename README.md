@@ -76,8 +76,8 @@ pip install -r requirements.txt
 
 Paths and settings are constants at the top of `main.py`:
 
-- `SIGNUPS_PATH`: the sign-up form export (`.xlsx` or `.csv`). Column headers must match the question text in the `Col` enum. The partner column is optional.
-- `MEMBERSHIPS_PATH`: the club membership list, which needs an `Email` column. Set `CHECK_MEMBERSHIP = False` to skip the membership check.
+- `SIGNUPS_DIR` / `SIGNUPS_GLOB`: the sign-up form exports (`.xlsx`). The newest is used automatically: the highest `(Week N)` in the filename. Column headers must match the question text in the `Col` enum. The partner column is optional.
+- `MEMBERSHIPS_DIR` / `MEMBERSHIPS_GLOB`: the club membership lists, which need an `Email` column. The newest is used automatically, by the timestamp in the filename. Set `CHECK_MEMBERSHIP = False` to skip the membership check.
 - `HISTORY_PATH` (`data/history.csv`): columns `ucl_email, played, missed_out, recency`. If it is missing, everyone is treated as a newcomer.
 - `CAPACITIES`: seats per session, keyed by the shortened session name (e.g. `Sat 17 Oct 1:30pm`). Sessions not listed use `DEFAULT_CAPACITY` and print a warning. Update these every week.
 - `SEED`: random seed. Runs with the same inputs and seed give the same result.

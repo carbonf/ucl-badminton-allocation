@@ -1,6 +1,7 @@
 import random
 import re
 import sys
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
@@ -9,8 +10,10 @@ import pandas as pd
 from scipy.optimize import milp, LinearConstraint, Bounds
 
 # Configuration
-MEMBERSHIPS_PATH = Path("data/Club-society membership list - DO NOT SHARE - 2026-10-12T17_44_07+0100.csv")
-SIGNUPS_PATH = Path("data/UCL Badminton Social Session Signups (Week 1)(1-114).xlsx")
+MEMBERSHIPS_DIR = Path("data")
+MEMBERSHIPS_GLOB = "Club-society membership list - DO NOT SHARE - *.csv"   # newest timestamp in the name wins
+SIGNUPS_DIR = Path("data")
+SIGNUPS_GLOB = "UCL Badminton Social Session Signups (Week *).xlsx"   # highest week number wins
 OUTPUTS_PATH = Path("outputs/allocations.xlsx")
 HISTORY_PATH = Path("data/history.csv")
 HISTORY_COLS = ["played", "missed_out", "recency"]
@@ -28,11 +31,11 @@ W_FLEX = 2             # each extra session ticked (pairs: in common) moves you 
                        # 4 extra sessions = 8 < W_MISSED, so flexibility only decides near-ties
 DEFAULT_CAPACITY = 18
 CAPACITIES = {
-	"Tue 13 Oct 6:00pm": 15,
-	"Sat 17 Oct 1:30pm": 15,
-	"Sat 17 Oct 3:30pm": 15,
-	"Sun 18 Oct 10:30am": 21,
-	"Sun 18 Oct 11:45am": 21,
+	"Tue 20 Oct 6:00pm": 15,
+	"Sat 24 Oct 1:30pm": 15,
+	"Sat 24 Oct 3:15pm": 15,
+	"Sun 25 Oct 10:30am": 21,
+	"Sun 25 Oct 11:45am": 21,
 }
 
 # Verbose diagnostics (scoring, history, matching decisions, checks) are on by default; --quiet turns them off.
@@ -47,7 +50,7 @@ def debug(*args) -> None:
 
 
 class Col(str, Enum):
-	# The values MUST BE THE EXACT QUESTION TEXT. Corresponds to columns in the sheet SIGNUPS_PATH
+	# The values MUST BE THE EXACT QUESTION TEXT. Corresponds to columns in the sign-ups sheet
 	NAME = "Name"
 	EMAIL = "Email"
 	FULL_NAME = "Full name"
@@ -80,6 +83,44 @@ def parse_sessions(cell) -> list[str]:
 	if pd.isna(cell):
 		return []
 	return [shorten_name(s.strip()) for s in str(cell).split(";") if s.strip()]
+
+TIMESTAMP_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}_\d{2}_\d{2}[+-]\d{4})")
+
+
+def latest_membership_file() -> Path:
+	"""Newest membership export, by the timestamp in its filename (e.g. 2026-10-19T00_44_39+0100).
+	The timezone offset is parsed, so a +0000 and a +0100 file still compare correctly."""
+	stamped = []
+	for p in MEMBERSHIPS_DIR.glob(MEMBERSHIPS_GLOB):
+		m = TIMESTAMP_RE.search(p.name)
+		if m:
+			stamped.append((datetime.strptime(m.group(1), "%Y-%m-%dT%H_%M_%S%z"), p))
+		else:
+			print(f"WARNING: ignoring membership file with no timestamp in its name: {p.name}")
+	if not stamped:
+		raise FileNotFoundError(f"No membership file matching '{MEMBERSHIPS_GLOB}' in {MEMBERSHIPS_DIR.resolve()}")
+	latest = max(stamped)[1]
+	debug(f"membership: using {latest.name} (newest of {len(stamped)} files)")
+	return latest
+
+
+SIGNUP_WEEK_RE = re.compile(r"Signups \(Week (\d+)\)")
+
+
+def latest_signups_file() -> Path:
+	"""Sign-up export with the highest week number in its filename, e.g. '(Week 2)'.
+	Files without a '(Week N)' label (such as old dated ones) are ignored."""
+	weekly = []
+	for p in SIGNUPS_DIR.glob(SIGNUPS_GLOB):
+		m = SIGNUP_WEEK_RE.search(p.name)
+		if m:
+			weekly.append((int(m.group(1)), p))
+	if not weekly:
+		raise FileNotFoundError(f"No sign-ups file with a '(Week N)' label matching '{SIGNUPS_GLOB}' in {SIGNUPS_DIR.resolve()}")
+	latest = max(weekly)[1]
+	debug(f"signups: using {latest.name} (highest week of {len(weekly)} files)")
+	return latest
+
 
 def load_file(path: Path) -> pd.DataFrame:
 	# Dynamically load file into pandas dataframe based on extension.
@@ -457,7 +498,7 @@ def save_results(allocated: pd.DataFrame, sessions: list[str], rejected: pd.Data
 
 
 def main() -> None:
-	raw = load_file(SIGNUPS_PATH)
+	raw = load_file(latest_signups_file())
 	signups, rejected = clean_signups(raw)
 	debug(f"signups: {len(raw)} rows -> {len(signups)} valid after cleaning "
 		  f"({sum(len(r) for r in rejected)} rejected so far); seed={SEED}")
@@ -468,7 +509,7 @@ def main() -> None:
 		print(f"  {short:32} <- {full}")
 
 	if CHECK_MEMBERSHIP:
-		signups, not_members = split_members(signups, load_file(MEMBERSHIPS_PATH))
+		signups, not_members = split_members(signups, load_file(latest_membership_file()))
 		debug(f"membership: {len(signups)} members, {len(not_members)} not on the list")
 		if len(not_members):
 			rejected.append(tag(not_members, "Not on membership list"))
