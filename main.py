@@ -1,4 +1,5 @@
 import random
+import io
 import re
 import shutil
 import sys
@@ -44,6 +45,24 @@ CAPACITIES = {
 # Nothing is written to disk unless --commit is given (workbook and history).
 DEBUG = "--quiet" not in sys.argv
 COMMIT = "--commit" in sys.argv
+
+# Set during a --commit: where this run's backup and log go. USED_FILES records the input files picked.
+RUN_DIR: Path | None = None
+USED_FILES: list[str] = []
+
+
+class Tee(io.TextIOBase):
+	"""Writes everything printed to the console into a buffer as well, so a commit can keep its log."""
+	def __init__(self, console, buffer):
+		self.console, self.buffer = console, buffer
+
+	def write(self, s: str) -> int:
+		self.console.write(s)
+		self.buffer.write(s)
+		return len(s)
+
+	def flush(self) -> None:
+		self.console.flush()
 
 
 def debug(*args) -> None:
@@ -102,6 +121,7 @@ def latest_membership_file() -> Path:
 	if not stamped:
 		raise FileNotFoundError(f"No membership file matching '{MEMBERSHIPS_GLOB}' in {MEMBERSHIPS_DIR.resolve()}")
 	latest = max(stamped)[1]
+	USED_FILES.append(f"membership: {latest.name}")
 	debug(f"membership: using {latest.name} (newest of {len(stamped)} files)")
 	return latest
 
@@ -120,6 +140,7 @@ def latest_signups_file() -> Path:
 	if not weekly:
 		raise FileNotFoundError(f"No sign-ups file with a '(Week N)' label matching '{SIGNUPS_GLOB}' in {SIGNUPS_DIR.resolve()}")
 	latest = max(weekly)[1]
+	USED_FILES.append(f"signups: {latest.name}")
 	debug(f"signups: using {latest.name} (highest week of {len(weekly)} files)")
 	return latest
 
@@ -483,19 +504,28 @@ def sheet_name(s: str) -> str:
 	return s[:31].translate(str.maketrans("/:\\?*[]", "-.-----"))
 
 
-def backup_state() -> Path | None:
-	"""Copy the files a commit overwrites (history and workbook) into BACKUP_DIR/<timestamp>/.
-	To undo a commit, copy them back. Returns the backup folder, or None if there was nothing to back up."""
+def backup_state() -> Path:
+	"""Create BACKUP_DIR/<timestamp>/ and copy into it the files a commit overwrites (history and workbook).
+	To undo a commit, copy them back. The same folder later receives run.log. Returns the folder."""
 	existing = [p for p in (HISTORY_PATH, OUTPUTS_PATH) if p.exists()]
-	if not existing:
-		print("Backup: nothing to back up yet (first run).")
-		return None
 	dest = BACKUP_DIR / datetime.now().strftime("%Y-%m-%d_%H%M%S")
 	dest.mkdir(parents=True, exist_ok=False)
+	if not existing:
+		print("Backup: nothing to back up yet (first run).")
+		return dest
 	for p in existing:
 		shutil.copy2(p, dest / p.name)
 	print(f"Backup: saved {', '.join(p.name for p in existing)} to {dest}")
 	return dest
+
+
+def write_run_log(run_dir: Path, console_output: str) -> None:
+	"""Save the console output of this commit, with a header saying exactly what was run."""
+	header = (f"Run at {datetime.now().isoformat(timespec='seconds')}\n"
+			  f"Command: {' '.join(sys.argv)}\n"
+			  f"Seed: {SEED}\n"
+			  + "".join(f"Input {f}\n" for f in USED_FILES) + "\n")
+	(run_dir / "run.log").write_text(header + console_output, encoding="utf-8")
 
 
 def save_results(allocated: pd.DataFrame, sessions: list[str], rejected: pd.DataFrame) -> None:
@@ -526,6 +556,7 @@ def print_rejected(rejected: pd.DataFrame) -> None:
 
 
 def main() -> None:
+	global RUN_DIR
 	raw = load_file(latest_signups_file())
 	signups, rejected = clean_signups(raw)
 	debug(f"signups: {len(raw)} rows -> {len(signups)} valid after cleaning "
@@ -557,7 +588,7 @@ def main() -> None:
 		print_rejected(rejected_df)
 
 	if COMMIT:
-		backup_state()   # before anything is overwritten; an error here aborts the commit
+		RUN_DIR = backup_state()   # before anything is overwritten; an error here aborts the commit
 		save_results(allocated, sessions, rejected_df)
 		update_history(allocated["_email"], result.loc[is_unallocated, "_email"])
 		print("History updated.")
@@ -568,4 +599,15 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-	main()
+	console, log = sys.stdout, io.StringIO()
+	sys.stdout = Tee(console, log)
+	try:
+		main()
+	except Exception as e:
+		log.write(f"\nRUN FAILED: {e!r}\n")
+		raise
+	finally:
+		sys.stdout = console
+		if RUN_DIR is not None:   # only commits keep a log; dry runs write nothing
+			write_run_log(RUN_DIR, log.getvalue())
+			print(f"Log saved to {RUN_DIR / 'run.log'}")
