@@ -78,6 +78,7 @@ class Col(str, Enum):
 	UCL_EMAIL_ADDR = "UCL email address"
 	SESSIONS = "Please select the sessions you wish to sign up for:"
 	PARTNER_EMAIL = "Partner's UCL email"
+	BEGINNER = "Do you identify as a beginner, if so, would you prefer to play with other beginners?"
 
 # ---------- Session short names ----------
 SESSION_RE = re.compile(r"^\s*(\w{3}) (\d{1,2}:\d{2}[ap]m)")   # "Tue 6:00pm - 8:00pm @ ..." -> "Tue 6:00pm"
@@ -187,6 +188,11 @@ def clean_signups(df: pd.DataFrame):
 		df[Col.PARTNER_EMAIL.value].fillna("").astype(str).str.strip().str.lower()
 		if Col.PARTNER_EMAIL.value in df.columns else ""
 	)
+	if Col.BEGINNER.value in df.columns:
+		df["_beginner"] = df[Col.BEGINNER.value].fillna("").astype(str).str.strip().str.lower().str.startswith("y")
+	else:
+		df["_beginner"] = False
+		print(f"WARNING: no beginner question column found; counting nobody as a beginner")
 
 	# Remove entries with blank emails
 	blank = df["_email"] == ""
@@ -466,6 +472,23 @@ def debug_demand(groups: list[dict], capacity: dict[str, int]) -> None:
 			  f"({len(wanting)} groups)")
 
 
+def debug_beginners(df: pd.DataFrame, groups: list[dict], assignment: dict[int, str],
+					capacity: dict[str, int]) -> None:
+	"""Per session: how many beginners ticked it, and how many ended up allocated to it."""
+	if not DEBUG:
+		return
+	placed = {m: s for gi, s in assignment.items() for m in groups[gi]["members"]}
+	debug(f"beginners: {int(df['_beginner'].sum())} of {len(df)} valid members")
+	for s in capacity:
+		ticked = df[df["_sessions"].apply(lambda l: s in l)]
+		allocated = [m for m, ps in placed.items() if ps == s]
+		b_alloc = int(df.loc[allocated, "_beginner"].sum())
+		debug(f"beginners {s:24} ticked={int(ticked['_beginner'].sum()):>3}/{len(ticked):<3} "
+			  f"allocated={b_alloc:>3}/{len(allocated):<3} (capacity {capacity[s]})")
+	b_none = int(df.loc[[i for i in df.index if i not in placed], "_beginner"].sum())
+	debug(f"beginners UNALLOCATED: {b_none}")
+
+
 def allocate(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 	"""Gives every sign-up a session or "UNALLOCATED". Returns (df + "Allocated session", session names)."""
 	rng = random.Random(SEED)
@@ -482,6 +505,7 @@ def allocate(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 
 	assignment = match(groups, capacity, rng)      # STEPS 3-4
 	verify_allocation(df, groups, assignment, capacity)
+	debug_beginners(df, groups, assignment, capacity)
 
 	# Expand each group's session back to every member (both partners of a pair get the same
 	# session). Anyone missing from `placed` becomes UNALLOCATED.
