@@ -68,7 +68,7 @@ pip install -r requirements.txt
 | --- | --- |
 | `main.py` | The allocator. |
 | `data/` | Inputs and history. Gitignored, because it contains personal data. |
-| `outputs/allocations.xlsx` | Results workbook, written only with `--commit`. |
+| `outputs/Allocations (Week N).xlsx` | Results workbook, named after the week of the sign-up file used. Written only with `--commit`. |
 
 ## Inputs
 
@@ -113,7 +113,7 @@ Weights are `W_PLAYED`, `W_MISSED`, `W_RECENCY`, `RECENCY_CAP` and `W_FLEX` in `
 
 ## Output
 
-`outputs/allocations.xlsx` has an `All allocated` sheet, one sheet per session, and a `Rejected` sheet. The `Rejected` sheet gives a reason for each rejection: no email, no sessions, not a member, or all selected sessions full.
+`outputs/Allocations (Week N).xlsx` has an `All allocated` sheet, one sheet per session, and a `Rejected` sheet. The `Rejected` sheet gives a reason for each rejection: no email, no sessions, not a member, or all selected sessions full.
 
 ## Known limitations
 

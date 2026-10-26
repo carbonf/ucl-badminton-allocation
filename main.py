@@ -16,7 +16,8 @@ MEMBERSHIPS_DIR = Path("data")
 MEMBERSHIPS_GLOB = "Club-society membership list - DO NOT SHARE - *.csv"   # newest timestamp in the name wins
 SIGNUPS_DIR = Path("data")
 SIGNUPS_GLOB = "UCL Badminton Social Session Signups (Week *).xlsx"   # highest week number wins
-OUTPUTS_PATH = Path("outputs/allocations.xlsx")
+OUTPUTS_DIR = Path("outputs")
+OUTPUTS_PATH = OUTPUTS_DIR / "allocations.xlsx"   # replaced in main() with 'Allocations (Week N).xlsx'
 HISTORY_PATH = Path("data/history.csv")
 BACKUP_DIR = Path("data/backups")   # each --commit first copies the files it will overwrite here
 HISTORY_COLS = ["played", "missed_out", "recency"]
@@ -576,8 +577,11 @@ def print_rejected(rejected: pd.DataFrame) -> None:
 
 
 def main() -> None:
-	global RUN_DIR
-	raw = load_file(latest_signups_file())
+	global RUN_DIR, OUTPUTS_PATH
+	signups_file = latest_signups_file()
+	week = SIGNUP_WEEK_RE.search(signups_file.name).group(1)
+	OUTPUTS_PATH = OUTPUTS_DIR / f"Allocations (Week {week}).xlsx"
+	raw = load_file(signups_file)
 	signups, rejected = clean_signups(raw)
 	debug(f"signups: {len(raw)} rows -> {len(signups)} valid after cleaning "
 		  f"({sum(len(r) for r in rejected)} rejected so far); seed={SEED}")
