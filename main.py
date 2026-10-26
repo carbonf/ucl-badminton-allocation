@@ -34,11 +34,11 @@ W_FLEX = 2             # each extra session ticked (pairs: in common) moves you 
                        # 4 extra sessions = 8 < W_MISSED, so flexibility only decides near-ties
 DEFAULT_CAPACITY = 18
 CAPACITIES = {
-	"Tue 20 Oct 6:00pm": 15,
-	"Sat 24 Oct 1:30pm": 15,
-	"Sat 24 Oct 3:15pm": 15,
-	"Sun 25 Oct 10:30am": 21,
-	"Sun 25 Oct 11:45am": 21,
+	"Tue 6:00pm": 15,
+	"Sat 1:30pm": 15,
+	"Sat 3:30pm": 15,
+	"Sun 10:30am": 21,
+	"Sun 11:45am": 21,
 }
 
 # Verbose diagnostics (scoring, history, matching decisions, checks) are on by default; --quiet turns them off.
@@ -80,19 +80,15 @@ class Col(str, Enum):
 	PARTNER_EMAIL = "Partner's UCL email"
 
 # ---------- Session short names ----------
-SESSION_RE = re.compile(r"(\d{1,2} \w{3}) \((\w{3})\) (\d{1,2}:\d{2}[ap]m)")
+SESSION_RE = re.compile(r"^\s*(\w{3}) (\d{1,2}:\d{2}[ap]m)")   # "Tue 6:00pm - 8:00pm @ ..." -> "Tue 6:00pm"
 SESSION_FULL: dict[str, str] = {}   # short name -> full form text
 
 
 def shorten_name(full: str) -> str:
 	# Takes a full session name and shortens it.
 
-	m = SESSION_RE.search(full)
-	if not m:
-		shortened = full
-	else:
-		date, day, start = m.groups()
-		shortened = f"{day} {date} {start}"
+	m = SESSION_RE.match(full)
+	shortened = " ".join(m.groups()) if m else full
 	
 	SESSION_FULL[shortened] = full
 	return shortened
