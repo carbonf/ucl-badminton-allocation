@@ -9,3 +9,4 @@ __pycache__/
 allocate_week v2.py
 generate_history.py
 test.py
+.DS_Store

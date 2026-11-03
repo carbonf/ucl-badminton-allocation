@@ -1,0 +1,79 @@
+{
+  "week": "Sample Week",
+  "generated_at": "2026-11-03 12:00",
+  "total_allocated": 1,
+  "total_entries": 3,
+  "sessions": [
+    {
+      "short": "Sun 11:45am",
+      "full": "Sun 11:45am - 1:00pm @ Maria Fidelis Catholic School",
+      "time": "Sun 11:45am - 1:00pm",
+      "venue": "Maria Fidelis Catholic School"
+    },
+    {
+      "short": "Sat 1:30pm",
+      "full": "Sat 1:30pm - 3:30pm @ Somers Town Community Sports Centre",
+      "time": "Sat 1:30pm - 3:30pm",
+      "venue": "Somers Town Community Sports Centre"
+    },
+    {
+      "short": "Tue 6:00pm",
+      "full": "Tue 6:00pm - 8:00pm @ Somers Town Community Sports Centre",
+      "time": "Tue 6:00pm - 8:00pm",
+      "venue": "Somers Town Community Sports Centre"
+    }
+  ],
+  "allocations": {
+    "04afb0f2f33a5049f9373e452f991ce7c792ec64a20fe872dfcd72c3bc2b094f": {
+      "status": "allocated",
+      "first_name": "Alex",
+      "session_short": "Sun 11:45am",
+      "session_full": "Sun 11:45am - 1:00pm @ Maria Fidelis Catholic School",
+      "time": "Sun 11:45am - 1:00pm",
+      "venue": "Maria Fidelis Catholic School",
+      "priority": {
+        "score": -120,
+        "played": 0,
+        "missed_out": 0,
+        "recency": 8,
+        "tier": "\ud83c\udf1f Top Priority",
+        "tier_class": "tier-vhigh",
+        "desc": "Newcomer / haven't played in recent weeks"
+      },
+      "reason": null,
+      "message": "You are confirmed for Sun 11:45am!"
+    },
+    "53985d1ccd1eb711d114646147f06b295b916bee83756df1534e16be2db449a1": {
+      "status": "waitlisted",
+      "first_name": "Sam",
+      "priority": {
+        "score": -30,
+        "played": 1,
+        "missed_out": 2,
+        "recency": 2,
+        "tier": "\u2728 High Priority",
+        "tier_class": "tier-high",
+        "desc": "Missed out previously or returning player"
+      },
+      "reason": "All selected sessions full",
+      "message": "All selected sessions were full.",
+      "tip": "You have received +10 priority points towards next week's allocation!"
+    },
+    "1e0c3263e5680e3d7b98f478dd253af301278bca47eb586c246df50a4938d278": {
+      "status": "membership_issue",
+      "first_name": "Jordan",
+      "priority": {
+        "score": -120,
+        "played": 0,
+        "missed_out": 0,
+        "recency": 8,
+        "tier": "\ud83c\udf1f Top Priority",
+        "tier_class": "tier-vhigh",
+        "desc": "Newcomer / haven't played in recent weeks"
+      },
+      "reason": "Not on membership list",
+      "message": "Not found on the active Students' Union membership list.",
+      "tip": "Ensure you have purchased a UCL Badminton membership and used the exact email on your Students' Union account."
+    }
+  }
+}
