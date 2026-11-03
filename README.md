@@ -85,10 +85,46 @@ Paths and settings are constants at the top of `main.py`:
 ```bash
 python main.py              # dry run with full debug output; nothing is saved
 python main.py --quiet      # dry run with minimal output
-python main.py --commit     # save the workbook and update the history
+python main.py --commit     # save the workbook, update history, and export web allocations
 ```
 
 A run without `--commit` writes nothing, not even the workbook. Use it to check the result first. Run with `--commit` once, when you are happy with the allocation. Committing twice ages everyone's recency twice.
+
+### Weekly Workflow Commands (In Order)
+
+Follow these steps every week to allocate sessions and update the lookup page:
+
+```bash
+# 1. Activate virtual environment
+source .venv/bin/activate
+
+# 2. Place inputs into data/
+#    - UCL Badminton Social Session Signups (Week N).xlsx
+#    - Club-society membership list - DO NOT SHARE - *.csv
+
+# 3. Test run (Dry run)
+python main.py
+
+# 4. Commit and export (generates outputs/Allocations.xlsx & docs/allocations.json)
+python main.py --commit
+
+# 5. Verify lookup and hashes
+python test_web_lookup.py
+
+# 6. (Optional) Preview locally in your browser
+python -m http.server --directory docs 8080
+# Open http://localhost:8080?email=demo.allocated@ucl.ac.uk
+
+# 7. Publish updated allocations to GitHub Pages
+git add docs/allocations.json
+git commit -m "Publish social allocations for Week N"
+git push origin main
+```
+
+> **Note:** If you already have an existing results workbook and only want to update the web portal without re-running the allocation solver:
+> ```bash
+> python web_export.py "outputs/Allocations (Week N).xlsx"
+> ```
 
 ### History
 
@@ -114,6 +150,14 @@ Weights are `W_PLAYED`, `W_MISSED`, `W_RECENCY`, `RECENCY_CAP` and `W_FLEX` in `
 ## Output
 
 `outputs/Allocations (Week N).xlsx` has an `All allocated` sheet, one sheet per session, and a `Rejected` sheet. The `Rejected` sheet gives a reason for each rejection: no email, no sessions, not a member, or all selected sessions full.
+
+### Web Allocations & Lookup Portal (`docs/`)
+
+When run with `--commit` (or via `python web_export.py`), an anonymized and privacy-preserving `docs/allocations.json` is automatically updated for GitHub Pages.
+
+- **Privacy by Design:** Emails are never published in plain text. Keys are one-way SHA-256 cryptographic hashes (`hashlib.sha256(email).hexdigest()`).
+- **Mobile Web App (`docs/index.html`):** Members visit the page, type their email, and the browser hashes it locally via the Web Crypto API to display their confirmed court session, time, venue Google Maps directions, and calendar invites.
+- **Enabling GitHub Pages:** In your repository on GitHub, go to **Settings > Pages > Build and deployment > Branch**, select `main` (or your default branch) and folder `/docs`.
 
 ## Known limitations
 

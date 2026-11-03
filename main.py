@@ -616,6 +616,11 @@ def main() -> None:
 		save_results(allocated, sessions, rejected_df)
 		update_history(allocated["_email"], result.loc[is_unallocated, "_email"])
 		print("History updated.")
+		try:
+			from web_export import export_allocations_to_json
+			export_allocations_to_json(OUTPUTS_PATH, week_label=f"Week {week}")
+		except Exception as e:
+			print(f"Warning: Web export failed: {e}")
 	else:
 		if DEBUG:   # show what a commit would change, without saving
 			update_history(allocated["_email"], result.loc[is_unallocated, "_email"], write=False)

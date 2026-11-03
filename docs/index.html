@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UCL Badminton Society — Social Allocations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ucl-purple: #500778;
+      --ucl-purple-dark: #380354;
+      --ucl-purple-light: #7b1fa2;
+      --accent-green: #059669;
+      --accent-green-bg: #ecfdf5;
+      --accent-amber: #d97706;
+      --accent-amber-bg: #fffbeb;
+      --accent-red: #dc2626;
+      --accent-red-bg: #fef2f2;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --radius: 16px;
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+      --shadow-lg: 0 12px 24px -4px rgb(80 7 120 / 0.12), 0 4px 8px -2px rgb(0 0 0 / 0.04);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 16px 48px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 580px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+      padding-top: 12px;
+    }
+
+    .badge-club {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(80, 7, 120, 0.08);
+      color: var(--ucl-purple);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-bottom: 12px;
+    }
+
+    .badge-club svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: var(--ucl-purple-dark);
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    /* Week Pill */
+    .week-indicator {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      background: #e2e8f0;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    /* Search Box Card */
+    .card-search {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 22px;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+
+    .card-search label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 8px;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    @media (min-width: 480px) {
+      .input-group {
+        flex-direction: row;
+      }
+    }
+
+    .input-field {
+      flex: 1;
+      padding: 13px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      font-size: 0.98rem;
+      font-family: inherit;
+      color: var(--text-main);
+      transition: all 0.2s ease;
+      background: #fdfdfd;
+      outline: none;
+    }
+
+    .input-field:focus {
+      border-color: var(--ucl-purple);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(80, 7, 120, 0.12);
+    }
+
+    .btn-search {
+      background: var(--ucl-purple);
+      color: #ffffff;
+      border: none;
+      padding: 13px 22px;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 4px rgba(80, 7, 120, 0.25);
+    }
+
+    .btn-search:hover {
+      background: var(--ucl-purple-dark);
+      transform: translateY(-1px);
+    }
+
+    .btn-search:active {
+      transform: translateY(0);
+    }
+
+    .input-hint {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 8px;
+      line-height: 1.4;
+    }
+
+    /* Result Card */
+    #result-container {
+      display: none;
+      margin-bottom: 20px;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow-md);
+      border: 1.5px solid var(--border);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 14px;
+    }
+
+    /* Allocated State */
+    .status-allocated {
+      border-color: #a7f3d0;
+    }
+    .badge-allocated {
+      background: var(--accent-green-bg);
+      color: var(--accent-green);
+    }
+
+    /* Waitlisted State */
+    .status-waitlisted {
+      border-color: #fde68a;
+    }
+    .badge-waitlisted {
+      background: var(--accent-amber-bg);
+      color: var(--accent-amber);
+    }
+
+    /* Issue State */
+    .status-issue {
+      border-color: #fecaca;
+    }
+    .badge-issue {
+      background: var(--accent-red-bg);
+      color: var(--accent-red);
+    }
+
+    /* Not Found */
+    .status-notfound {
+      border-color: var(--border);
+    }
+    .badge-notfound {
+      background: #f1f5f9;
+      color: #64748b;
+    }
+
+    .result-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-bottom: 6px;
+    }
+
+    .result-subtitle {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-bottom: 18px;
+    }
+
+    .session-details-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 18px;
+    }
+
+    .detail-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .detail-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .detail-icon {
+      font-size: 1.15rem;
+      line-height: 1.3;
+      flex-shrink: 0;
+    }
+
+    .detail-label {
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+    }
+
+    .detail-value {
+      font-size: 0.96rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .venue-link {
+      font-size: 0.82rem;
+      color: var(--ucl-purple);
+      text-decoration: none;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 3px;
+    }
+
+    .venue-link:hover {
+      text-decoration: underline;
+    }
+
+    /* Action Buttons in Result */
+    .result-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .calendar-actions-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .calendar-actions-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .calendar-btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .btn-cal {
+      background: #ffffff;
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      padding: 9px 13px;
+      border-radius: 9px;
+      font-size: 0.83rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+
+    .btn-cal:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+      transform: translateY(-1px);
+    }
+
+    .btn-cal svg {
+      width: 15px;
+      height: 15px;
+      flex-shrink: 0;
+    }
+
+    .btn-secondary {
+      background: #f1f5f9;
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+
+    .btn-secondary:hover {
+      background: #e2e8f0;
+    }
+
+    /* Priority Stats Card */
+    .priority-box {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-top: 16px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    }
+
+    .priority-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .priority-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .priority-tier-badge {
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: #f1f5f9;
+      color: var(--text-main);
+    }
+
+    .priority-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      background: #f8fafc;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      text-align: center;
+    }
+
+    @media (max-width: 480px) {
+      .priority-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+    }
+
+    .priority-stat-val {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--ucl-purple);
+      line-height: 1.2;
+    }
+
+    .priority-stat-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .priority-note {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 8px;
+      line-height: 1.4;
+    }
+
+    .callout-box {
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      margin-top: 12px;
+    }
+
+    .callout-green {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+    }
+
+    .callout-amber {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #92400e;
+    }
+
+    .callout-red {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+    }
+
+    /* Sessions Overview Section */
+    .sessions-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    .sessions-card h2 {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .sessions-card h2 svg {
+      width: 18px;
+      height: 18px;
+      transition: transform 0.2s ease;
+    }
+
+    .sessions-card.collapsed h2 svg {
+      transform: rotate(-90deg);
+    }
+
+    .sessions-card.collapsed .sessions-list {
+      display: none;
+    }
+
+    .sessions-list {
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .session-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background: #f8fafc;
+      border-radius: 8px;
+      font-size: 0.86rem;
+    }
+
+    .session-item-title {
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .session-item-venue {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      margin-top: auto;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    footer a {
+      color: var(--ucl-purple);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    .privacy-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: #64748b;
+      font-size: 0.75rem;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge-club">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="m4.93 4.93 4.24 4.24"></path>
+          <path d="m14.83 9.17 4.24-4.24"></path>
+          <path d="m14.83 14.83 4.24 4.24"></path>
+          <path d="m9.17 14.83-4.24 4.24"></path>
+          <circle cx="12" cy="12" r="4"></circle>
+        </svg>
+        UCL Badminton Society
+      </div>
+      <h1>Social Allocations</h1>
+      <p class="subtitle">Enter your email below to check your allocated session.</p>
+      <div id="week-badge" class="week-indicator">Loading allocations...</div>
+    </header>
+
+    <!-- Search Card -->
+    <div class="card-search">
+      <label for="email-input">Your UCL or Signup Email</label>
+      <div class="input-group">
+        <input 
+          type="email" 
+          id="email-input" 
+          class="input-field" 
+          placeholder="e.g. firstname.lastname.00@ucl.ac.uk" 
+          autocomplete="email"
+          spellcheck="false"
+        >
+        <button id="search-btn" class="btn-search">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          Check
+        </button>
+      </div>
+      <div class="input-hint">
+        Use the exact email address you submitted on the sign-up form.
+      </div>
+    </div>
+
+    <!-- Result Display Container -->
+    <div id="result-container">
+      <!-- Dynamic result will be rendered here -->
+    </div>
+
+    <!-- Sessions Overview -->
+    <div class="sessions-card" id="sessions-overview-card">
+      <h2 onclick="toggleSessions()">
+        <span>Weekly Sessions Schedule</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </h2>
+      <div class="sessions-list" id="sessions-list">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>Powered by the <a href="https://github.com/carbonf/ucl-badminton-allocation" target="_blank">UCL Badminton Allocation System</a>.</p>
+      <div class="privacy-tag">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        Client-side SHA-256 hashed lookup. Your email is never uploaded or tracked.
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    let allocationData = null;
+
+    // Load allocations.json
+    async function loadData() {
+      try {
+        const res = await fetch('allocations.json');
+        if (!res.ok) throw new Error('Failed to load allocations.json');
+        allocationData = await res.json();
+        
+        // Update week badge
+        const badge = document.getElementById('week-badge');
+        badge.textContent = `${allocationData.week || 'Current Week'} (${allocationData.total_allocated || 0} players allocated)`;
+        
+        // Populate sessions list
+        renderSessions(allocationData.sessions || []);
+      } catch (err) {
+        console.error(err);
+        document.getElementById('week-badge').textContent = 'Allocations updated weekly';
+      }
+    }
+
+    function renderSessions(sessions) {
+      const list = document.getElementById('sessions-list');
+      if (!sessions || sessions.length === 0) {
+        list.innerHTML = '<div style="font-size:0.85rem;color:#64748b;">Schedule will be published when sign-ups close.</div>';
+        return;
+      }
+      list.innerHTML = sessions.map(s => `
+        <div class="session-item">
+          <div>
+            <div class="session-item-title">${escapeHtml(s.time || s.short)}</div>
+            <div class="session-item-venue">${escapeHtml(s.venue || 'Sports Hall')}</div>
+          </div>
+          <a class="venue-link" target="_blank" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.venue || 'UCL')}">Maps &rarr;</a>
+        </div>
+      `).join('');
+    }
+
+    function toggleSessions() {
+      document.getElementById('sessions-overview-card').classList.toggle('collapsed');
+    }
+
+    // SHA-256 hashing using Web Crypto API
+    async function sha256(message) {
+      const msgBuffer = new TextEncoder().encode(message);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function checkAllocation() {
+      const emailInput = document.getElementById('email-input');
+      const email = emailInput.value.trim().toLowerCase();
+      const container = document.getElementById('result-container');
+
+      if (!email) {
+        emailInput.focus();
+        return;
+      }
+
+      if (!allocationData || !allocationData.allocations) {
+        alert("Allocation data is still loading. Please try again in a moment.");
+        return;
+      }
+
+      const emailHash = await sha256(email);
+      const record = allocationData.allocations[emailHash];
+
+      renderResult(record, email);
+      container.style.display = 'block';
+      container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function renderResult(record, email) {
+      const container = document.getElementById('result-container');
+
+      if (!record) {
+        // Not found
+        container.innerHTML = `
+          <div class="result-card status-notfound">
+            <div class="status-badge badge-notfound">Not Found</div>
+            <h3 class="result-title">No Sign-up Found</h3>
+            <p class="result-subtitle">We couldn't find an entry for <strong>${escapeHtml(email)}</strong> this week.</p>
+            <div class="callout-box" style="background:#f8fafc; border:1px solid #e2e8f0; color:#475569;">
+              <strong>Troubleshooting tips:</strong>
+              <ul style="margin: 6px 0 0 18px; line-height: 1.5;">
+                <li>Check for any typo in your email.</li>
+                <li>If you have a display email (e.g. <code>firstname.lastname.26@ucl.ac.uk</code>) and a UPI email (e.g. <code>zc...</code>), try searching both.</li>
+                <li>Make sure your form submission completed before the weekly deadline.</li>
+              </ul>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (record.status === 'allocated') {
+        const mapsQuery = encodeURIComponent(`${record.venue}, London`);
+        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+        const cal = buildCalendarUrls(record.first_name, record.session_short, record.time || record.session_short, record.venue);
+
+        container.innerHTML = `
+          <div class="result-card status-allocated">
+            <div class="status-badge badge-allocated">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              Confirmed Spot
+            </div>
+            <h3 class="result-title">Hi ${escapeHtml(record.first_name)}! You're in! 🎉</h3>
+            <p class="result-subtitle">You have been allocated a court place for this week's social.</p>
+            
+            <div class="session-details-box">
+              <div class="detail-row">
+                <div class="detail-icon">⏰</div>
+                <div>
+                  <div class="detail-label">Session & Time</div>
+                  <div class="detail-value">${escapeHtml(record.time || record.session_short)}</div>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-icon">📍</div>
+                <div>
+                  <div class="detail-label">Location</div>
+                  <div class="detail-value">${escapeHtml(record.venue)}</div>
+                  <a href="${mapsUrl}" target="_blank" class="venue-link">
+                    Open in Google Maps &rarr;
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div class="callout-box callout-green">
+              🏸 <strong>Session Reminders:</strong> Please bring your own badminton racket, wear clean non-marking indoor court shoes, and arrive 5 minutes before your session begins.
+            </div>
+
+            ${renderPriorityBox(record.priority)}
+
+            <div class="result-actions">
+              <div class="calendar-actions-box">
+                <div class="calendar-actions-title">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                  Add to Calendar
+                </div>
+                <div class="calendar-btn-row">
+                  <a class="btn-cal" href="${cal.gcalUrl}" target="_blank" rel="noopener">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#ea4335" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    Google Calendar
+                  </a>
+                  <a class="btn-cal" href="${cal.outlookUrl}" target="_blank" rel="noopener">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#0078d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                    Outlook (UCL 365)
+                  </a>
+                  <button class="btn-cal" onclick="downloadCalendarInvite('${escapeHtml(record.first_name)}', '${escapeHtml(record.session_short)}', '${escapeHtml(record.time)}', '${escapeHtml(record.venue)}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Apple / .ics
+                  </button>
+                </div>
+              </div>
+
+              <a class="btn-secondary" href="https://chat.whatsapp.com" target="_blank" style="align-self: flex-start;">
+                💬 Open WhatsApp Group
+              </a>
+            </div>
+          </div>
+        `;
+      } else if (record.status === 'waitlisted') {
+        container.innerHTML = `
+          <div class="result-card status-waitlisted">
+            <div class="status-badge badge-waitlisted">Waitlisted</div>
+            <h3 class="result-title">Hi ${escapeHtml(record.first_name)}, sessions were full</h3>
+            <p class="result-subtitle">All slots for your chosen sessions reached maximum capacity.</p>
+            
+            <div class="callout-box callout-amber">
+              ⭐ <strong>Good news:</strong> You've automatically received <strong>+10 Priority Points</strong> towards next week's allocation! When you sign up next week, you will be placed ahead of players who played this week.
+            </div>
+
+            ${renderPriorityBox(record.priority)}
+
+            <div class="result-actions">
+              <a class="btn-secondary" href="https://github.com/carbonf/ucl-badminton-allocation" target="_blank">
+                ℹ️ How Priority Scoring Works
+              </a>
+            </div>
+          </div>
+        `;
+      } else if (record.status === 'membership_issue') {
+        container.innerHTML = `
+          <div class="result-card status-issue">
+            <div class="status-badge badge-issue">Membership Required</div>
+            <h3 class="result-title">Hi ${escapeHtml(record.first_name)}, Membership Not Found</h3>
+            <p class="result-subtitle">${escapeHtml(record.message)}</p>
+            
+            <div class="callout-box callout-red">
+              ⚠️ <strong>Action Needed:</strong> Our system checks sign-ups against the official Students' Union UCL club membership list. To be allocated a spot, you must hold a valid UCL Badminton membership under this exact email.
+            </div>
+
+            <div class="result-actions">
+              <a class="btn-secondary" style="background:#500778; color:#fff; border:none;" href="https://studentsunionucl.org/clubs-societies/badminton-club" target="_blank">
+                Get Badminton Membership &rarr;
+              </a>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // Render transparent priority points card
+    function renderPriorityBox(priority) {
+      if (!priority) return '';
+      const scoreDisplay = priority.score > 0 ? `+${priority.score}` : `${priority.score}`;
+      return `
+        <div class="priority-box">
+          <div class="priority-header">
+            <div class="priority-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              Priority Standing & History
+            </div>
+            <div class="priority-tier-badge">${escapeHtml(priority.tier)}</div>
+          </div>
+          <div class="priority-grid">
+            <div>
+              <div class="priority-stat-val">${scoreDisplay}</div>
+              <div class="priority-stat-label">Priority Score</div>
+            </div>
+            <div>
+              <div class="priority-stat-val">${priority.played}</div>
+              <div class="priority-stat-label">Played (+20)</div>
+            </div>
+            <div>
+              <div class="priority-stat-val">${priority.missed_out}</div>
+              <div class="priority-stat-label">Turnaways (-10)</div>
+            </div>
+            <div>
+              <div class="priority-stat-val">${priority.recency}w</div>
+              <div class="priority-stat-label">Absence (-15/w)</div>
+            </div>
+          </div>
+          <div class="priority-note">
+            💡 <strong>How places are decided:</strong> A <em>lower</em> score places you earlier. Turning away moves you forward (-10 pts); playing moves you back (+20 pts).
+          </div>
+        </div>
+      `;
+    }
+
+    // Calculate session date and start/end times
+    function getSessionDateTimes(timeStr) {
+      const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+      const dayMatch = (timeStr || '').match(/(sun|mon|tue|wed|thu|fri|sat)/i);
+      const targetDay = dayMatch ? days.indexOf(dayMatch[1].toLowerCase()) : -1;
+
+      const now = new Date();
+      let sessionDate = new Date();
+      if (targetDay !== -1) {
+        const currentDay = now.getDay();
+        let diff = targetDay - currentDay;
+        if (diff < 0) diff += 7; // next occurrence
+        sessionDate.setDate(now.getDate() + diff);
+      }
+
+      const timeRangeMatch = (timeStr || '').match(/(\d{1,2}):(\d{2})\s*(am|pm)\s*-\s*(\d{1,2}):(\d{2})\s*(am|pm)/i);
+      let startDate = new Date(sessionDate);
+      let endDate = new Date(sessionDate);
+
+      if (timeRangeMatch) {
+        let [_, sh, sm, sp, eh, em, ep] = timeRangeMatch;
+        let startHours = parseInt(sh, 10);
+        if (sp.toLowerCase() === 'pm' && startHours < 12) startHours += 12;
+        if (sp.toLowerCase() === 'am' && startHours === 12) startHours = 0;
+        startDate.setHours(startHours, parseInt(sm, 10), 0, 0);
+
+        let endHours = parseInt(eh, 10);
+        if (ep.toLowerCase() === 'pm' && endHours < 12) endHours += 12;
+        if (ep.toLowerCase() === 'am' && endHours === 12) endHours = 0;
+        endDate.setHours(endHours, parseInt(em, 10), 0, 0);
+      } else {
+        startDate.setHours(12, 0, 0, 0);
+        endDate.setHours(13, 15, 0, 0);
+      }
+      return { startDate, endDate };
+    }
+
+    // Build direct calendar URLs for Google and Outlook 365
+    function buildCalendarUrls(firstName, shortSession, timeStr, venue) {
+      const { startDate, endDate } = getSessionDateTimes(timeStr);
+      const title = `🏸 UCL Social Badminton (${shortSession})`;
+      const details = `Hi ${firstName}, you have a confirmed court place for UCL Badminton Social session. Remember to bring your racket and clean non-marking indoor court shoes!`;
+      const location = `${venue}, London`;
+
+      const pad = (n) => String(n).padStart(2, '0');
+      const formatGCal = (d) => `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+      
+      const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${formatGCal(startDate)}/${formatGCal(endDate)}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}`;
+      const outlookUrl = `https://outlook.office.com/calendar/0/deeplink/compose?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}&startdt=${encodeURIComponent(startDate.toISOString())}&enddt=${encodeURIComponent(endDate.toISOString())}`;
+
+      return { gcalUrl, outlookUrl, startDate, endDate };
+    }
+
+    // Generate .ics calendar download
+    function downloadCalendarInvite(firstName, shortSession, timeStr, venue) {
+      // Basic ICS generator for the allocated event
+      const icsData = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//UCL Badminton Society//Social Sessions//EN',
+        'BEGIN:VEVENT',
+        `SUMMARY:🏸 UCL Social Badminton (${shortSession})`,
+        `DESCRIPTION:Hi ${firstName}, you have a confirmed court spot for UCL Badminton Social session. Remember indoor non-marking court shoes and your racket!`,
+        `LOCATION:${venue}`,
+        'STATUS:CONFIRMED',
+        'END:VEVENT',
+        'END:VCALENDAR'
+      ].join('\r\n');
+
+      const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.setAttribute('download', `UCL-Badminton-${shortSession.replace(/\s+/g, '-')}.ics`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Event Listeners
+    document.getElementById('search-btn').addEventListener('click', checkAllocation);
+    document.getElementById('email-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') checkAllocation();
+    });
+
+    // Auto-search if ?email= in URL query params
+    window.addEventListener('DOMContentLoaded', async () => {
+      await loadData();
+      const params = new URLSearchParams(window.location.search);
+      const queryEmail = params.get('email');
+      if (queryEmail) {
+        document.getElementById('email-input').value = queryEmail;
+        checkAllocation();
+      }
+    });
+  </script>
+</body>
+</html>
+
